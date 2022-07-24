@@ -1143,6 +1143,7 @@ class IrcClient {
      * @param {string} message The message to send
      * @param {Date|null} sentTime The time the message was sent or null for no particular time (can be used for chat history)
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async sendChatMessage(channel, sender, message, sentTime = null) {
         // Split message by newlines
@@ -1164,10 +1165,26 @@ class IrcClient {
     }
 
     /**
+     * Sends a "/me"-styled chat message to the client.
+     * Since "/me" messages are just normal messages with special styling, this method is just a wrapper around sendChatMessage with specific text formatting.
+     * Messages with newlines or over the message length limit will be broken up and sent as multiple messages.
+     * @param {string} channel The channel (or user if no suffix is present) from which the message came
+     * @param {IrcUserInfo} sender The sender's info
+     * @param {string} message The message to send
+     * @param {Date|null} sentTime The time the message was sent or null for no particular time (can be used for chat history)
+     * @return {Promise<void>}
+     * @since 1.1.0
+     */
+    async sendMeMessage(channel, sender, message, sentTime = null) {
+        await this.sendChatMessage(channel, sender, `ACTION ${message}`, sentTime)
+    }
+
+    /**
      * Sends a user away message to the client
      * @param {IrcUserInfo} userInfo The away user's info
      * @param {string|null} message The away message, or null for "I'm away" (defaults to null)
      * @return {Promise<void>}
+     * @since 1.0.0
      */
     async sendUserAway(userInfo, message = null) {
         await this.sendRawLine(`:${userInfo.nick}!~u@${userInfo.hostname} AWAY :${message || 'I\'m away'}`)
@@ -1177,6 +1194,7 @@ class IrcClient {
      * Sends a self away message to the client (has no effect if the user is not authenticated)
      * @param {string|null} message The away message, or null for "I'm away" (defaults to null)
      * @return {Promise<void>}
+     * @since 1.0.0
      */
     async sendSelfAway(message = null) {
         if(this.isAuthenticated) {
@@ -1189,6 +1207,7 @@ class IrcClient {
      * Sends a user back message to the client
      * @param {IrcUserInfo} userInfo The back user's info
      * @return {Promise<void>}
+     * @since 1.0.0
      */
     async sendUserBack(userInfo) {
         await this.sendRawLine(`:${userInfo.nick}!~u@${userInfo.hostname} AWAY`)
@@ -1197,6 +1216,7 @@ class IrcClient {
     /**
      * Sends a self back message to the client (has no effect if the user is not authenticated)
      * @return {Promise<void>}
+     * @since 1.0.0
      */
     async sendSelfBack() {
         if(this.isAuthenticated) {
@@ -1210,6 +1230,7 @@ class IrcClient {
      * @param {IrcUserInfo} userInfo The info of the user that is changing their nick
      * @param {string} newNick The user's new nick
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async sendUserChangedNick(userInfo, newNick) {
         await this.sendRawLine(`:${userInfo.nick}!~u@${userInfo.hostname} NICK ${newNick}`, true)
@@ -1219,6 +1240,7 @@ class IrcClient {
      * Sends a nick rejected message to the client
      * @param {string} newNick The new nick that was rejected
      * @param {string|null} message The rejection message, or null for "Nick is already taken" (defaults to null)
+     * @since 1.0.0
      */
     async sendNickRejected(newNick, message = null) {
         await this.sendServerMessage(`433 ${this.nickOrAsterisk} ${newNick}`, message || 'Nick is already taken', true)
@@ -1228,6 +1250,7 @@ class IrcClient {
      * Sends an online users check response to the client
      * @param {string[]} onlineNicks The list of nicks that are online
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async sendOnlineCheckResponse(onlineNicks) {
         let prefix = `303 ${this.nickOrAsterisk}`
@@ -1241,6 +1264,7 @@ class IrcClient {
      * Sends a user online notification to the client
      * @param {string} nick The nick of the user that just came online
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async sendUserOnline(nick) {
         await this.sendServerMessage(`730 ${this.nickOrAsterisk} ${nick}`)
@@ -1250,6 +1274,7 @@ class IrcClient {
      * Changes the client's nick (has no effect if the user is not authenticated)
      * @param {string} newNick The new nick
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async setNick(newNick) {
         if(this.isAuthenticated) {
@@ -1262,6 +1287,7 @@ class IrcClient {
      * Sets the user's new mode
      * @param {string} mode The new mode string
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async setMode(mode) {
         this.#mode = mode
@@ -1272,6 +1298,7 @@ class IrcClient {
      * Sets the client's hostname (has no effect is the user is not authenticated)
      * @param {string} hostname The new hostname
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async setHostname(hostname) {
         if(this.isAuthenticated)
@@ -1281,6 +1308,7 @@ class IrcClient {
     /**
      * Pings the client and returns the number of milliseconds it took to receive a reply
      * @returns {Promise<number>} The number of milliseconds it took to receive a reply
+     * @since 1.0.0
      */
     async ping() {
         const start = getCurrentMs()
