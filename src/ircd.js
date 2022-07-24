@@ -156,20 +156,57 @@ class Ircd {
 
     /**
      * Broadcasts a notice to all clients
-     * @param {string} message The notice message
+     * @param {string} message The notice
+     * @param {string|null} name The name that will appear next to the announcement, or null for none (defaults to null)
      * @returns {Promise<void>}
      * @since 1.0.0
      */
-    async broadcastNotice(message) {
-        for(let client of this.connectedClients) {
-            try {
-                await client.sendNotice(message)
-            } catch(e) {
-                // TODO Standardize logging, allow attaching a logger, etc
-                console.error('Failed to send notice to client: ', e)
-                client.onError(e)
-            }
-        }
+    broadcastNotice(message, name = null) {
+        for(const client of this.connectedClients)
+            client.sendNotice(message, name).finally()
+    }
+
+    /**
+     * Returns whether there is a client with the specified nick connected
+     * @param {string} nick The nick to check for
+     * @returns {boolean} Whether there is a client with the specified nick connected
+     */
+    isNickConnected(nick) {
+        for(const client of this.authenticatedClients)
+            if(client.nick === nick)
+                return true
+
+        return false
+    }
+
+    /**
+     * Returns the client with the specified nick or null if none was found.
+     * If you have multiple clients connected with the same nick, you may want to use getClientsByNick(nick).
+     * @param {string} nick The nick to search for
+     * @returns {IrcClient|null} The client or null if none was found
+     */
+    getClientByNick(nick) {
+        for(const client of this.authenticatedClients)
+            if(client.nick === nick)
+                return client
+
+        return null
+    }
+
+    /**
+     * Returns all clients with the specified nick
+     * If you just want to return one client, you may want to use getClientByNick(nick).
+     * @param {string} nick The nick to search for
+     * @returns {IrcClient[]} The clients
+     */
+    getClientsByNick(nick) {
+        const res = []
+
+        for(const client of this.authenticatedClients)
+            if(client.nick === nick)
+                res.push(client)
+
+        return res
     }
 }
 
