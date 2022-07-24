@@ -10,6 +10,8 @@ const { genId } = require('../util/idgen')
  * @property {string} nick The user's nick
  * @property {string} username The user's username
  * @property {string} realname The user's real name
+ * @property {string} hostname The user's hostname (can be real or fake)
+ * @property {`${'H'|'G'}${string}`?} status The user's status (optional, e.g. 'H@' for online op, 'G' for away, 'G+' for away voiced, 'H~' for online owner, etc)
  * @since 1.0.0
  */
 
@@ -88,8 +90,58 @@ const { genId } = require('../util/idgen')
  */
 
 /**
- * @callback IrcClientOnlineCheck
- * @param {string} nick The nick of the client the client is checking
+ * @callback IrcClientOnlineCheckHandler
+ * @param {string[]} nicks An array of nicks the client is requesting to check for
+ * @returns {Promise<void>}
+ * @since 1.0.0
+ */
+
+/**
+ * @callback IrcClientJoinHandler
+ * @param {string} channel The name of the channel the client is requesting to join
+ * @returns {Promise<void>}
+ * @since 1.0.0
+ */
+
+/**
+ * @callback IrcClientPartHandler
+ * @param {string} channel The name of the channel the client is requesting to part
+ * @param {string|null} reason The part reason, or null if none
+ * @returns {Promise<void>}
+ * @since 1.0.0
+ */
+
+/**
+ * @callback IrcClientChannelInfoHandler
+ * @param {string} channel The name of the channel the client is requesting info for
+ * @returns {Promise<void>}
+ * @since 1.0.0
+ */
+
+/**
+ * @callback IrcClientChannelUsersHandler
+ * @param {string} channel The name of the channel the client is requesting users for
+ * @returns {Promise<void>}
+ * @since 1.0.0
+ */
+
+/**
+ * @callback IrcClientChatMessageHandler
+ * @param {string} channel The channel (or nick, if there is no prefix) in which the client sent the message
+ * @param {string} message The chat message
+ * @returns {Promise<void>}
+ * @since 1.0.0
+ */
+
+/**
+ * @callback IrcClientAwayHandler
+ * @param {string} message The away message
+ * @returns {Promise<void>}
+ * @since 1.0.0
+ */
+
+/**
+ * @callback IrcClientBackHandler
  * @returns {Promise<void>}
  * @since 1.0.0
  */
@@ -212,10 +264,50 @@ class IrcClient {
      * @type {IrcClientAuthTimeoutHandler[]}
      */
     #authTimeoutHandlers = []
+    /**
+     * Online check handlers
+     * @type {IrcClientOnlineCheckHandler[]}
+     */
+    #onlineCheckHandlers = []
+    /**
+     * Join handlers
+     * @type {IrcClientJoinHandler[]}
+     */
+    #joinHandlers = []
+    /**
+     * Part handlers
+     * @type {IrcClientPartHandler[]}
+     */
+    #partHandlers = []
+    /**
+     * Channel info handlers
+     * @type {IrcClientChannelInfoHandler[]}
+     */
+    #channelInfoHandlers = []
+    /**
+     * Channel users handlers
+     * @type {IrcClientChannelUsersHandler[]}
+     */
+    #channelUsersHandlers = []
+    /**
+     * Chat message handlers
+     * @type {IrcClientChatMessageHandler[]}
+     */
+    #chatMessageHandlers = []
+    /**
+     * Away handlers
+     * @type {IrcClientAwayHandler[]}
+     */
+    #awayHandlers = []
+    /**
+     * Back handlers
+     * @type {IrcClientBackHandler[]}
+     */
+    #backHandlers = []
 
     /**
      * Removes a handler from an array of handlers based on its ID
-     * @param {{ id: number }[]} handlers The handlers
+     * @param {any & { id: number }[]} handlers The handlers
      * @param {number} id The handler ID
      */
     #removeHandler(handlers, id) {
@@ -415,6 +507,158 @@ class IrcClient {
     removeOnAuthTimeout(id) {
         this.#removeHandler(this.#authTimeoutHandlers, id)
     }
+
+    /**
+     * Registers an online check handler.
+     * Online check handlers are called when the user asks to know whether a user is online or not.
+     * @param {IrcClientOnlineCheckHandler} handler The handler
+     * @returns {number} The handler ID
+     */
+    onOnlineCheck(handler) {
+        handler.id = genId()
+        this.#onlineCheckHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes an online check handler
+     * @param {number} id The handler ID
+     */
+    removeOnOnlineCheck(id) {
+        this.#removeHandler(this.#onlineCheckHandlers, id)
+    }
+
+    /**
+     * Registers a join handler.
+     * Join handlers are called when the user tries to join a channel.
+     * @param {IrcClientJoinHandler} handler The handler
+     * @returns {number} The handler ID
+     */
+    onJoin(handler) {
+        handler.id = genId()
+        this.#joinHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes a join handler
+     * @param {number} id The handler ID
+     */
+    removeOnJoin(id) {
+        this.#removeHandler(this.#joinHandlers, id)
+    }
+
+    /**
+     * Registers a part handler.
+     * Part handlers are called when the user tries to part a channel.
+     * @param {IrcClientPartHandler} handler The handler
+     * @returns {number} The handler ID
+     */
+    onPart(handler) {
+        handler.id = genId()
+        this.#partHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes a part handler
+     * @param {number} id The handler ID
+     */
+    removeOnPart(id) {
+        this.#removeHandler(this.#partHandlers, id)
+    }
+
+    /**
+     * Registers a channel info handler.
+     * Channel info handlers are called when the user requests info about a channel.
+     * @param {IrcClientChannelInfoHandler} handler The handler
+     * @returns {number} The handler ID
+     */
+    onChannelInfo(handler) {
+        handler.id = genId()
+        this.#channelInfoHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes a channel info handler
+     * @param {number} id The handler ID
+     */
+    removeOnChannelInfo(id) {
+        this.#removeHandler(this.#channelInfoHandlers, id)
+    }
+
+    /**
+     * Registers a channel users handler.
+     * Channel users handlers are called when the user requests a channel's user list.
+     * @param {IrcClientChannelUsersHandler} handler The handler
+     * @returns {number} The handler ID
+     */
+    onChannelUsers(handler) {
+        handler.id = genId()
+        this.#channelUsersHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes a channel users handler
+     * @param {number} id The handler ID
+     */
+    removeOnChannelUsers(id) {
+        this.#removeHandler(this.#channelUsersHandlers, id)
+    }
+
+    /**
+     * Registers a chat message handler.
+     * Chat message handlers are called when the user sends a chat message, either in a channel or as a private message
+     * @param {IrcClientChatMessageHandler} handler The handler
+     * @returns {number} The handler ID
+     */
+    onChatMessage(handler) {
+        handler.id = genId()
+        this.#chatMessageHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes a chat message handler
+     * @param {number} id The handler ID
+     */
+    removeOnChatMessage(id) {
+        this.#removeHandler(this.#chatMessageHandlers, id)
+    }
+
+    /**
+     * Registers an away handler.
+     * Away handlers are called when the user marks himself/herself as away
+     * @param {IrcClientAwayHandler} handler The handler
+     * @returns {number} The handler ID
+     */
+    onAway(handler) {
+        handler.id = genId()
+        this.#awayHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes an away handler
+     * @param {number} id The handler ID
+     */
+    removeOnAway(id) {
+        this.#removeHandler(this.#awayHandlers, id)
+    }
+
+    /**
+     * Registers a back handler.
+     * Back handlers are called when the user marks himself/herself as back (not away)
+     * @param {IrcClientBackHandler} handler The handler
+     * @returns {number} The handler ID
+     */
+    onBack(handler) {
+        handler.id = genId()
+        this.#backHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes a back handler
+     * @param {number} id The handler ID
+     */
+    removeOnBack(id) {
+        this.#removeHandler(this.#backHandlers, id)
+    }
     
     /**
      * Creates a new client object
@@ -481,8 +725,14 @@ class IrcClient {
      * @returns {Promise<void>}
      */
     async initialize() {
+        // Periodically ping the client
+        const pingInterval = setInterval(() => this.ping(), 5_000)
+
         // Setup socket handlers
-        this.socket.on('end', () => IrcClient.#dispatchEvent('disconnect', this.#disconnectHandlers))
+        this.socket.on('end', () => {
+            IrcClient.#dispatchEvent('disconnect', this.#disconnectHandlers)
+            clearInterval(pingInterval)
+        })
         this.socket.on('error', err => IrcClient.#dispatchEvent('socket error', this.#socketErrorHandlers, [ err ]))
 
         // Malformed line error util
@@ -515,7 +765,7 @@ class IrcClient {
                 // Dispatch line event
                 await IrcClient.#dispatchEvent('line', this.#lineHandlers, [parsed])
 
-                // Check if it's a QUIT
+                // Handle QUITs
                 if(parsed.name === 'QUIT') {
                     await IrcClient.#dispatchEvent('quit', this.#quitHandlers, [parsed.content])
                     await this.disconnect()
@@ -524,18 +774,38 @@ class IrcClient {
 
                 try {
                     if(this.isAuthenticated) {
+                        // TODO Implement ISON with online check handlers
                         if(parsed.name === 'PING') { // Respond to client pings
                             this.lastPingDate = new Date()
                             const pingData = parsed.metadata
-                            await IrcClient.#dispatchEvent('ping', this.#pingHandlers, [pingData])
+                            await IrcClient.#dispatchEvent('ping', this.#pingHandlers, [ pingData ])
                             await this.sendServerMessage(`PONG ${this.ircd.hostname} ${pingData}`, null, true)
-                        } else if(parsed.name === 'PRIVMSG') {
-                            // TODO Messaging code
-                        } else if(parsed.name !== 'PONG') { // Unknown commands
-                            await this.sendError(`Unknown command "${parsed.name}"`)
-                        }
+                        } else if(parsed.name === 'JOIN') { // Channel join
+                            const channel = parsed.metadata
+                            if(channel)
+                                await IrcClient.#dispatchEvent('join', this.#joinHandlers, [ channel ])
+                        } else if(parsed.name === 'PART') { // CHannel part
+                            const channel = parsed.metadata
+                            if(channel)
+                                await IrcClient.#dispatchEvent('part', this.#partHandlers, [ channel, parsed.content ])
+                        } else if(parsed.name === 'MODE') { // Mode commands
+                            if(parsed.content === null) { // Channel info request
+                                await IrcClient.#dispatchEvent('channel info', this.#channelInfoHandlers, [ parsed.metadata ])
+                            }
 
-                        // TODO Normal logic
+                            // TODO Other mode commands
+                        } else if(parsed.name === 'WHO') { // Channel user list
+                            await IrcClient.#dispatchEvent('channel users', this.#channelUsersHandlers, [ parsed.metadata.split(' ')[0] ]) // Doesn't support the full spec, just fetches all users
+                        } else if(parsed.name === 'PRIVMSG') { // Message
+                            await IrcClient.#dispatchEvent('chat message', this.#chatMessageHandlers, [ parsed.metadata, parsed.content ])
+                        } else if(parsed.name === 'AWAY') { // Away/back
+                            if(parsed.content === null)
+                                await IrcClient.#dispatchEvent('back', this.#backHandlers)
+                            else
+                                await IrcClient.#dispatchEvent('away', this.#awayHandlers, [ parsed.content ])
+                        } else if(parsed.name !== 'PONG' /* <-- skip some commands that aren't handled in here */) { // Unknown commands
+                            await this.sendServerMessage(`421 ${this.nickOrAsterisk} ${parsed.name}`, 'Unknown command', true)
+                        }
                     } else {
                         // Authentication phase logic
                         const authLogic = async () => {
@@ -579,7 +849,8 @@ class IrcClient {
                             const userInfo = {
                                 nick: authNick,
                                 username: authUsername,
-                                realname: authRealname
+                                realname: authRealname,
+                                hostname: this.ircd.hostname
                             }
 
                             // Clear auth timeout
@@ -654,6 +925,7 @@ class IrcClient {
      * @param {string|null} errorMsg The error message to send, or null for none (defaults to null)
      * @param {number} msgTimeout The timeout in millilseconds to wait for the error message to send before disconnecting the client (defaults to 5_000) (has no effect is errorMsg is null)
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async disconnect(errorMsg = null, msgTimeout = 5_000) {
         // Try to send the error message
@@ -678,9 +950,10 @@ class IrcClient {
      * @param {string} line The line to send
      * @param {boolean} prependTime Whether to prepend the current timestamp (defaults to false)
      * @return {Promise<void>}
+     * @since 1.0.0
      */
     async sendRawLine(line, prependTime = false) {
-        const ln = prependTime ? `@time=${new Date().toISOString()} ${line}` : line
+        const ln = (prependTime && this.capabilities.includes('server-time')) ? `@time=${new Date().toISOString()} ${line}` : line
         await new Promise((res, _rej) => {
             this.socket.write(ln+'\n', () => res())
         })
@@ -692,6 +965,7 @@ class IrcClient {
      * @param {string|null} content The message content or null for none (defaults to null)
      * @param {boolean} prependTime Whether to prepend the current timestamp (defaults to false}
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async sendServerMessage(metadata, content = null, prependTime = false) {
         await this.sendRawLine(`:${this.ircd.hostname} ${metadata}${content === null ? '' : ' :'+content}`, prependTime)
@@ -700,19 +974,23 @@ class IrcClient {
     /**
      * Sends a notice to the client
      * @param {string} message The notice
+     * @param {string|null} name The name that will appear next to the announcement, or null for none (defaults to null)
      * @return {Promise<void>}
+     * @since 1.0.0
      */
-    async sendNotice(message) {
+    async sendNotice(message, name = null) {
         const lns = message.split('\n')
+        const senderPrefix = name === null ? '' : `${name}!${name}@`
         for(const ln of lns)
             if(ln.length > 0)
-                await this.sendServerMessage('NOTICE '+this.nickOrAsterisk, ln)
+                await this.sendRawLine(`:${senderPrefix}${this.ircd.hostname} NOTICE ${this.nickOrAsterisk} :${ln}`, true)
     }
 
     /**
      * Sends an error message to the client
      * @param {string} message The error message
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async sendError(message) {
         const lns = message.split('\n')
@@ -723,14 +1001,174 @@ class IrcClient {
 
     /**
      * Sends Message Of The Day text to the client
-     * @param motd
+     * @param {string} motd The MotD text
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async sendMotd(motd) {
         const lns = motd.split('\n')
         for(const ln of lns)
             await this.sendServerMessage('372 '+this.nickOrAsterisk, ln)
         await this.sendServerMessage('376 '+this.nickOrAsterisk, 'End of MOTD command')
+    }
+
+    /**
+     * Sends a user channel join to the client
+     * @param {string} channel The channel the user joined
+     * @param {IrcUserInfo} userInfo The info of the user that joined
+     * @returns {Promise<void>}
+     * @since 1.0.0
+     */
+    async sendUserJoin(channel, userInfo) {
+        await this.sendRawLine(`:${userInfo.nick}!~u@${userInfo.hostname} JOIN ${channel} * ${userInfo.realname}`, true)
+    }
+
+    /**
+     * Sends a self channel join to the client (this has no effect if the user is not authenticated)
+     * @param {string} channel The channel to join
+     * @returns {Promise<void>}
+     * @since 1.0.0
+     */
+    async sendSelfJoin(channel) {
+        if(this.isAuthenticated)
+            await this.sendUserJoin(channel, this.userInfo)
+    }
+
+    /**
+     * Sends a user channel part to the client
+     * @param {string} channel The channel the user parted
+     * @param {IrcUserInfo} userInfo The info of the user that joined
+     * @param {string|null} reason The reason the user left, or null for "Leaving" (defaults to null)
+     * @returns {Promise<void>}
+     * @since 1.0.0
+     */
+    async sendUserPart(channel, userInfo, reason = null) {
+        await this.sendRawLine(`:${userInfo.nick}!~u@${userInfo.hostname} PART ${channel} ${reason || 'Leaving'}`)
+    }
+
+    /**
+     * Sends a self channel part to the client (this has no effect if the user is not authenticated)
+     * @param {string} channel The channel to part
+     * @param {string|null} reason The reason to part, or null for "Leaving" (defaults to null)
+     * @returns {Promise<void>}
+     * @since 1.0.0
+     */
+    async sendSelfPart(channel, reason = null) {
+        if(this.isAuthenticated)
+            await this.sendUserPart(channel, this.userInfo, reason)
+    }
+
+    /**
+     * Sends info about a channel to the client
+     * @param {string} channel The channel
+     * @param {string|null} topic The channel topic, or null for none
+     * @param {IrcUserInfo} creatorInfo The channel creator's user info
+     * @param {string} mode The channel mode (e.g. "+Cnt")
+     * @param {Date} creationDate The date when the channel was created
+     * @param {IrcUserInfo[]} users The channel users
+     * @returns {Promise<void>}
+     * @since 1.0.0
+     */
+    async sendChannelInfo(channel, topic, creatorInfo, mode, creationDate, users) {
+        // Send topic if present
+        if(topic !== null)
+            await this.sendServerMessage(`332 ${this.nick} ${channel} ${topic}`, null, true)
+
+        const timestamp = Math.floor(creationDate.getTime()/1000)
+
+        // Send general info
+        await this.sendServerMessage(`333 ${this.nick} ${channel} ${creatorInfo.nick}!~u@${creatorInfo.hostname} ${timestamp}`, null, true)
+
+        // Send user list
+        for(let i = 0; i < Math.ceil(users.length/3); i++)
+            await this.sendServerMessage(`353 ${this.nick} = ${channel}`, users.slice(i*3, (i*3)+3).map(user => `${(user.status || 'H').substring(1)}${user.nick}!~u@${user.hostname}`).join(' '), true)
+        await this.sendServerMessage(`336 ${this.nick} ${channel}`, 'End of NAMES list', true)
+
+        // Send mode and timestamp
+        await this.sendServerMessage(`324 ${this.nick} ${channel} ${mode}`, null, true)
+        await this.sendServerMessage(`329 ${this.nick} ${channel} ${timestamp}`, null, true)
+    }
+
+    /**
+     * Sends a list of channel users to the client
+     * @param {string} channel The channel
+     * @param {IrcUserInfo[]} users An array of user info (and optionally user status like 'H', 'G' optionally suffixed with '@', '~', '&', '+', etc)
+     * @returns {Promise<void>}
+     * @since 1.0.0
+     */
+    async sendChannelUsers(channel, users) {
+        for(const user of users)
+            await this.sendServerMessage(`352 ${this.nickOrAsterisk} ${channel} ${user.username} ${user.hostname} ${this.ircd.hostname} ${user.nick} ${user.status || 'H'} :0 ${user.realname}`, null, true)
+        await this.sendServerMessage(`315 ${this.nickOrAsterisk} ${channel}`, 'End of WHO list', true)
+    }
+
+    /**
+     * Sends a chat message to the client.
+     * Messages with newlines or over the message length limit will be broken up and sent as multiple messages.
+     * @param {string} channel The channel (or user if no suffix is present) from which the message came
+     * @param {IrcUserInfo} sender The sender's info
+     * @param {string} message The message to send
+     * @returns {Promise<void>}
+     */
+    async sendChatMessage(channel, sender, message) {
+        // Split message by newlines
+        const msgs = message.split('\n')
+
+        // Send each message
+        for(let msg of msgs) {
+            // Skip empty messages
+            if(msg.length < 1)
+                continue
+
+            // Send message in 512 character chunks until there is no remaining text to send
+            while(msg.length > 0) {
+                const toSend = msg.substring(0, 512)
+                msg = msg.substring(toSend.length)
+                await this.sendRawLine(`:${sender.nick}!~u@${sender.hostname} PRIVMSG ${channel} :${toSend}`, true)
+            }
+        }
+    }
+
+    /**
+     * Sends a user away message to the client
+     * @param {IrcUserInfo} userInfo The away user's info
+     * @param {string|null} message The away message, or null for "I'm away" (defaults to null)
+     * @return {Promise<void>}
+     */
+    async sendUserAway(userInfo, message = null) {
+        await this.sendRawLine(`:${userInfo.nick}!~u@${userInfo.hostname} AWAY :${message || 'I\'m away'}`)
+    }
+
+    /**
+     * Sends a self away message to the client (this has no effect if the user is not authenticated)
+     * @param {string|null} message The away message, or null for "I'm away" (defaults to null)
+     * @return {Promise<void>}
+     */
+    async sendSelfAway(message = null) {
+        if(this.isAuthenticated) {
+            await this.sendServerMessage(`306 ${this.nick} :You have been marked as away`)
+            await this.sendUserAway(this.userInfo, message)
+        }
+    }
+
+    /**
+     * Sends a user back message to the client
+     * @param {IrcUserInfo} userInfo The back user's info
+     * @return {Promise<void>}
+     */
+    async sendUserBack(userInfo) {
+        await this.sendRawLine(`:${userInfo.nick}!~u@${userInfo.hostname} AWAY`)
+    }
+
+    /**
+     * Sends a self back message to the client (this has no effect if the user is not authenticated)
+     * @return {Promise<void>}
+     */
+    async sendSelfBack() {
+        if(this.isAuthenticated) {
+            await this.sendServerMessage(`305 ${this.nick} :You are no longer marked as away`)
+            await this.sendUserBack(this.userInfo)
+        }
     }
 
     /**
@@ -741,6 +1179,16 @@ class IrcClient {
     async setMode(mode) {
         this.#mode = mode
         await this.sendServerMessage('221 '+this.nickOrAsterisk, mode)
+    }
+
+    /**
+     * Sets the client's hostname (has no effect is the user is not authenticated)
+     * @param {string} hostname The new hostname
+     * @returns {Promise<void>}
+     */
+    async setHostname(hostname) {
+        if(this.isAuthenticated)
+            this.userInfo.hostname = hostname
     }
 
     /**
