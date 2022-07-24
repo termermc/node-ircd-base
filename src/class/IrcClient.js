@@ -738,7 +738,7 @@ class IrcClient {
      */
     async initialize() {
         // Periodically ping the client
-        const pingInterval = setInterval(() => this.ping(), 5_000)
+        const pingInterval = setInterval(() => this.ping(), this.ircd.clientPingPeriod)
 
         // Setup socket handlers
         this.socket.on('close', () => {

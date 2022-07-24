@@ -78,6 +78,13 @@ class Ircd {
     authenticationTimeout = 10_000
 
     /**
+     * The period of time between proactively pinging clients
+     * @type {number}
+     * @since 1.0.0
+     */
+    clientPingPeriod = 10_000
+
+    /**
      * Creates a new IRCd object
      * @param {string?} customHostname The custom hostname to use for server messages (does not affect bind host)
      * @since 1.0.0
