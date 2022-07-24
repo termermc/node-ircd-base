@@ -214,10 +214,22 @@ class IrcClient {
     #mode = ''
 
     /**
+     * Whether the client disconnected
+     * @type {boolean}
+     */
+    #disconnected = false
+
+    /**
      * Returns the user's current mode
      * @returns {string}
      */
     get mode() { return this.#mode }
+
+    /**
+     * Returns whether the client is disconnected
+     * @returns {boolean}
+     */
+    get isDisconnected() { return this.#disconnected }
 
     /**
      * Disconnect handlers
@@ -427,7 +439,7 @@ class IrcClient {
     /**
      * Registers a failed login handler.
      * Failed login handlers are called when the client failed a login attempt.
-     * The login process is reset after this point, but the programmer has the option of simply disconnecting the client.
+     * The login process is restarted after this point (although negotiated values are still temporarily held), but the programmer has the option of simply disconnecting the client or issuing a taken nick message.
      * @param {IrcClientFailedLoginHandler} handler The handler
      * @returns {number} The handler ID
      * @since 1.0.0
@@ -729,7 +741,8 @@ class IrcClient {
         const pingInterval = setInterval(() => this.ping(), 5_000)
 
         // Setup socket handlers
-        this.socket.on('end', () => {
+        this.socket.on('close', () => {
+            this.#disconnected = true
             IrcClient.#dispatchEvent('disconnect', this.#disconnectHandlers)
             clearInterval(pingInterval)
         })
@@ -747,10 +760,11 @@ class IrcClient {
         let authCapsEnded = false
 
         // Authentication timeout
-        const authTimeout = setTimeout(async () => {
+        const authTimeoutFunc = async () => {
             await IrcClient.#dispatchEvent('auth timeout', this.#authTimeoutHandlers)
             await this.disconnect('You took too long to authenticate')
-        }, this.ircd.authenticationTimeout)
+        }
+        let authTimeout = setTimeout(authTimeoutFunc, this.ircd.authenticationTimeout)
 
         // Setup line reader
         const carry = carrier.carry(this.socket)
@@ -820,13 +834,6 @@ class IrcClient {
                             const commonResLogic = async handlers => {
                                 acceptedOrDenied = true
 
-                                // Reset temporary auth values
-                                authNick = null
-                                authUsername = null
-                                authRealname = null
-                                authPass = null
-                                authCaps = null
-
                                 // Call handlers
                                 for (const handler of handlers)
                                     await handler(userInfo, authPass)
@@ -840,6 +847,9 @@ class IrcClient {
                             }
                             const deny = async () => {
                                 await commonResLogic(this.#failedLoginHandlers)
+
+                                // Because the authentication attempt was denied, reset the authentication timeout
+                                authTimeout = setTimeout(authTimeoutFunc, this.ircd.authenticationTimeout)
                             }
 
                             // Create user info object
@@ -853,7 +863,7 @@ class IrcClient {
                                 hostname: this.ircd.hostname
                             }
 
-                            // Clear auth timeout
+                            // Clear auth timeout to avoid authentication logic being interrupted
                             clearTimeout(authTimeout)
 
                             // Loop through handlers, calling each one in order until accept() or deny() has been called by one of them
@@ -864,6 +874,10 @@ class IrcClient {
 
                         if (parsed.name === 'NICK') { // Nick setting command
                             authNick = parsed.metadata
+
+                            // If all metadata is already set, call auth logic
+                            if(authNick !== null && authUsername !== null && authRealname !== null && authCaps !== null)
+                                await authLogic()
                         } else if (parsed.name === 'PASS') { // Password command
                             authPass = parsed.metadata
                         } else if (parsed.name === 'USER') { // User info setting command
@@ -1024,7 +1038,7 @@ class IrcClient {
     }
 
     /**
-     * Sends a self channel join to the client (this has no effect if the user is not authenticated)
+     * Sends a self channel join to the client (has no effect if the user is not authenticated)
      * @param {string} channel The channel to join
      * @returns {Promise<void>}
      * @since 1.0.0
@@ -1047,7 +1061,7 @@ class IrcClient {
     }
 
     /**
-     * Sends a self channel part to the client (this has no effect if the user is not authenticated)
+     * Sends a self channel part to the client (has no effect if the user is not authenticated)
      * @param {string} channel The channel to part
      * @param {string|null} reason The reason to part, or null for "Leaving" (defaults to null)
      * @returns {Promise<void>}
@@ -1140,7 +1154,7 @@ class IrcClient {
     }
 
     /**
-     * Sends a self away message to the client (this has no effect if the user is not authenticated)
+     * Sends a self away message to the client (has no effect if the user is not authenticated)
      * @param {string|null} message The away message, or null for "I'm away" (defaults to null)
      * @return {Promise<void>}
      */
@@ -1161,13 +1175,44 @@ class IrcClient {
     }
 
     /**
-     * Sends a self back message to the client (this has no effect if the user is not authenticated)
+     * Sends a self back message to the client (has no effect if the user is not authenticated)
      * @return {Promise<void>}
      */
     async sendSelfBack() {
         if(this.isAuthenticated) {
             await this.sendServerMessage(`305 ${this.nick} :You are no longer marked as away`)
             await this.sendUserBack(this.userInfo)
+        }
+    }
+
+    /**
+     * Sends a user changed nick message to the client
+     * @param {IrcUserInfo} userInfo The info of the user that is changing their nick
+     * @param {string} newNick The user's new nick
+     * @returns {Promise<void>}
+     */
+    async sendUserChangedNick(userInfo, newNick) {
+        await this.sendRawLine(`:${userInfo.nick}!~u@${userInfo.hostname} NICK ${newNick}`)
+    }
+
+    /**
+     * Sends a nick rejected message to the client
+     * @param {string} newNick The new nick that was rejected
+     * @param {string|null} message The rejection message, or null for "Nick is already taken" (defaults to null)
+     */
+    async sendNickRejected(newNick, message = null) {
+        await this.sendServerMessage(`433 ${this.nickOrAsterisk} ${newNick}`, message || 'Nick is already taken')
+    }
+
+    /**
+     * Changes the client's nick (has no effect if the user is not authenticated)
+     * @param {string} newNick The new nick
+     * @returns {Promise<void>}
+     */
+    async setNick(newNick) {
+        if(this.isAuthenticated) {
+            await this.sendUserChangedNick(this.userInfo, newNick)
+            this.userInfo.nick = newNick
         }
     }
 
