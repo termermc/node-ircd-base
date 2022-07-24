@@ -1030,8 +1030,7 @@ class IrcClient {
         await this.sendServerMessage(`002 ${this.nickOrAsterisk}`, hostMsg)
         await this.sendServerMessage(`003 ${this.nickOrAsterisk}`, creationDateMsg)
         await this.sendServerMessage(`004 ${this.nickOrAsterisk} ${this.ircd.hostname} ${serverVersion}`)
-        await this.sendServerMessage(`005 ${this.nickOrAsterisk}`, welcomeMsg)
-        await this.sendServerMessage(`001 ${this.nickOrAsterisk} NETWORK=${networkName} NICKLEN=32 UTF8MAPPING=rfc8265 UTF8ONLY`, 'are supported by this server')
+        await this.sendServerMessage(`005 ${this.nickOrAsterisk} MODES NETWORK=${networkName} NICKLEN=32 UTF8MAPPING=rfc8265 UTF8ONLY`, 'are supported by this server')
     }
 
     /**
