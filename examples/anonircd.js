@@ -5,7 +5,7 @@ const config = {
 	/**
 	 * The host to bind to
 	 */
-	host: 'localhost',
+	host: '127.0.0.1',
 	/**
 	 * The port to bind to
 	 */
@@ -55,10 +55,7 @@ const startTime = new Date()
 
 // Create IRCd
 const { Ircd } = require('../index')
-const ircd = new Ircd()
-
-// Set hostname
-ircd.hostname = config.hostname
+const ircd = new Ircd(config.hostname)
 
 // Create connection logic
 ircd.onConnect(async function(client) {
@@ -146,5 +143,5 @@ ircd.onConnect(async function(client) {
 
 // Start server
 ircd.listen(config.port, config.host).then(function() {
-	console.log(`Listening at ${ircd.host}:${ircd.port}`)
+	console.log(`Listening at ${config.host}:${config.port}`)
 })

@@ -1,5 +1,14 @@
 const net = require('net')
+const { readFile } = require('fs/promises')
 const IrcClient = require('./client')
+
+// Check for TLS support
+let tls = null
+try {
+    tls = require('tls')
+} catch(err) {
+    // TLS support is not available
+}
 
 /**
  * @callback IrcClientConnectHandler
@@ -30,38 +39,12 @@ class Ircd {
     authenticatedClients = []
 
     /**
-     * The server bind host
+     * The server's hostname.
+     * Does not affect where the server listens, is only cosmetic.
      * @type {string}
      * @since 1.0.0
      */
-    host = 'localhost'
-
-    /**
-     * The custom hostname if any
-     * @type {string|null}
-     */
-    #customHostname = null
-
-    /**
-     * The server's current hostname, derived from either the bind host or a custom hostname set using this property
-     * @returns {string}
-     * @since 1.0.0
-     */
-    get hostname() {
-        if(this.#customHostname !== null)
-            return this.#customHostname
-        else
-            return this.host
-    }
-    /**
-     * Sets a custom hostname for the server
-     * @param {string} hostname
-     * @since 1.0.0
-     */
-    set hostname(hostname) {
-        if(hostname)
-            this.#customHostname = hostname
-    }
+    hostname
 
     /**
      * Registered connection handlers
@@ -84,64 +67,82 @@ class Ircd {
     clientPingPeriod = 10_000
 
     /**
-     * Creates a new IRCd object
-     * @param {string?} customHostname The custom hostname to use for server messages (does not affect bind host)
+     * Creates a new IRCd
+     * @param {string} hostname The hostname to use for server messages (does not affect bind host)
      * @since 1.0.0
      */
-    constructor(customHostname) {
-        if(customHostname)
-            this.#customHostname = customHostname
+    constructor(hostname) {
+        this.hostname = hostname
     }
 
     /**
-     * Starts the server listens on the specified port, and optionally host
+     * Handler for connecting sockets
+     * @param {net.Socket} sock The socket
+     */
+    async #socketHandler(sock) {
+        // Create client object
+        const client = new IrcClient(sock, this)
+
+        // Add client to clients list
+        this.connectedClients.push(client)
+
+        // Dispatch connect event
+        for (const handler of this.#connectHandlers)
+            await handler(client)
+
+        // Register client handlers to manage connected client lists
+        let clientIsAuthed = false
+        client.onSuccessfulLogin(() => {
+            // Add client to authenticated clients list
+            clientIsAuthed = true
+            this.authenticatedClients.push(client)
+        })
+        client.onDisconnect(() => {
+            // Remove client from connected clients list
+            for(let i = 0; i < this.connectedClients.length; i++)
+                if(this.connectedClients[i] === client)
+                    this.connectedClients.splice(i, 1)
+
+            // Remove client from authenticated clients list if authenticated
+            if(clientIsAuthed)
+                for(let i = 0; i < this.authenticatedClients.length; i++)
+                    if(this.authenticatedClients[i] === client)
+                        this.authenticatedClients.splice(i, 1)
+        })
+
+        // Initialize the client
+        await client.initialize()
+    }
+
+    /**
+     * Listens on the specified port, and optionally host.
+     * If TLS options are provided, the server will listen with TLS.
+     * This method may be called multiple times on the same server to listen on multiple ports and interfaces.
      * @param {number} port The port to listen on
-     * @param {string?} host The host to listen on (leave blank to bind on the local interface)
+     * @param {string|null} host The host to listen on, or null to bind on the local interface (defaults to null)
+     * @param {{ keyPath: string, certPath: string }|null} tlsOptions TLS options (keyPath: the path to the key file, certPath: the path to the cert file), or null not to listen with TLS (defaults to null)
      * @returns {Promise<void>}
      * @since 1.0.0
      */
-    async listen(port, host) {
-        // Assign port and host
-        this.port = port
-        if(host)
-            this.host = host
+    async listen(port, host = null, tlsOptions = null) {
+        let server
+        if(tlsOptions === null) { // No TLS options provided; create plaintext server
+            server = net.createServer(sock => this.#socketHandler(sock))
+        } else { // TLS options provided; create TLS server
+            // Check for TLS support
+            if(tls === null)
+                throw new Error(`System is missing TLS support; IRCd cannot listen with TLS on ${host}:${port}`)
 
-        // Start server
-        const server = net.createServer(async sock => {
-            // Create client object
-            const client = new IrcClient(sock, this)
+            // If TLS options are provided, load files
+            const key = await readFile(tlsOptions.keyPath)
+            const cert = await readFile(tlsOptions.certPath)
 
-            // Add client to clients list
-            this.connectedClients.push(client)
+            // Create TLS-enabled server
+            server = tls.createServer({ key, cert }, sock => this.#socketHandler(sock))
+        }
 
-            // Dispatch connect event
-            for (const handler of this.#connectHandlers)
-                await handler(client)
-
-            // Register client handlers to manage connected client lists
-            let clientIsAuthed = false
-            client.onSuccessfulLogin(() => {
-                // Add client to authenticated clients list
-                clientIsAuthed = true
-                this.authenticatedClients.push(client)
-            })
-            client.onDisconnect(() => {
-                // Remove client from connected clients list
-                for(let i = 0; i < this.connectedClients.length; i++)
-                    if(this.connectedClients[i] === client)
-                        this.connectedClients.splice(i, 1)
-
-                // Remove client from authenticated clients list if authenticated
-                if(clientIsAuthed)
-                    for(let i = 0; i < this.authenticatedClients.length; i++)
-                        if(this.authenticatedClients[i] === client)
-                            this.authenticatedClients.splice(i, 1)
-            })
-
-            // Initialize the client
-            client.initialize()
-        })
-        await new Promise((res, _rej) => server.listen(this.port, this.host, res))
+        // Listen
+        await new Promise((res, _rej) => server.listen(port, host || '127.0.0.1', res))
     }
 
     /**
