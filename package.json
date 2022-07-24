@@ -1,0 +1,19 @@
+{
+  "name": "ircd-base",
+  "version": "1.0.0",
+  "description": "A bare-bones and extensible embedded IRC daemon for NodeJS",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ircd",
+    "api",
+    "base"
+  ],
+  "author": "Termer",
+  "license": "MIT",
+  "dependencies": {
+    "carrier": "^0.3.0"
+  }
+}
