@@ -1,6 +1,9 @@
 # node-ircd-base
 A Node.js library for implementing IRC servers using a simple API
 
+# Install
+To install it in your project, run `npm install ircd-base` or `yarn add ircd-base`.
+
 # What is it?
 This library is a set of building blocks to create your own IRC server (IRCd).
 This can be used for a variety of purposes, including creating IRC gateways to other protocols, creating custom chat servers, and integrating IRC into existing Node.js projects.
