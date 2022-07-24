@@ -418,7 +418,7 @@ class IrcClient {
     /**
      * Registers a successful login handler.
      * Successful login handlers are called when the client successfully logs in.
-     * It is the obligation of the programmer to set the client's mode after a successful login to let the client know that it is now properly authenticated.
+     * IMPORTANT: It is the obligation of the programmer to send the server info, send the MotD, and set the client's mode after a successful login to let the client know that it is now properly authenticated.
      * @param {IrcClientSuccessfulLoginHandler} handler The handler
      * @returns {number} The handler ID
      * @since 1.0.0
@@ -788,7 +788,6 @@ class IrcClient {
 
                 try {
                     if(this.isAuthenticated) {
-                        // TODO Implement ISON with online check handlers
                         if(parsed.name === 'PING') { // Respond to client pings
                             this.lastPingDate = new Date()
                             const pingData = parsed.metadata
@@ -817,6 +816,8 @@ class IrcClient {
                                 await IrcClient.#dispatchEvent('back', this.#backHandlers)
                             else
                                 await IrcClient.#dispatchEvent('away', this.#awayHandlers, [ parsed.content ])
+                        } else if(parsed.name === 'ISON') {
+                            await IrcClient.#dispatchEvent('online check', this.#onlineCheckHandlers, [ parsed.metadata.split(' ') ])
                         } else if(parsed.name !== 'PONG' /* <-- skip some commands that aren't handled in here */) { // Unknown commands
                             await this.sendServerMessage(`421 ${this.nickOrAsterisk} ${parsed.name}`, 'Unknown command', true)
                         }
@@ -962,12 +963,13 @@ class IrcClient {
     /**
      * Sends a raw line to the client
      * @param {string} line The line to send
-     * @param {boolean} prependTime Whether to prepend the current timestamp (defaults to false)
+     * @param {boolean} prependTime Whether to prepend the current timestamp (defaults to true)
+     * @param {Date|null} timestamp The timestamp to prepend or null for now
      * @return {Promise<void>}
      * @since 1.0.0
      */
-    async sendRawLine(line, prependTime = false) {
-        const ln = (prependTime && this.capabilities.includes('server-time')) ? `@time=${new Date().toISOString()} ${line}` : line
+    async sendRawLine(line, prependTime = true, timestamp = null) {
+        const ln = (prependTime && this.capabilities.includes('server-time')) ? `@time=${(timestamp || new Date()).toISOString()} ${line}` : line
         await new Promise((res, _rej) => {
             this.socket.write(ln+'\n', () => res())
         })
@@ -977,11 +979,11 @@ class IrcClient {
      * Sends a server message to the client
      * @param {string} metadata The message metadata
      * @param {string|null} content The message content or null for none (defaults to null)
-     * @param {boolean} prependTime Whether to prepend the current timestamp (defaults to false}
+     * @param {boolean} prependTime Whether to prepend the current timestamp (defaults to true}
      * @returns {Promise<void>}
      * @since 1.0.0
      */
-    async sendServerMessage(metadata, content = null, prependTime = false) {
+    async sendServerMessage(metadata, content = null, prependTime = true) {
         await this.sendRawLine(`:${this.ircd.hostname} ${metadata}${content === null ? '' : ' :'+content}`, prependTime)
     }
 
@@ -1011,6 +1013,25 @@ class IrcClient {
         for(const ln of lns)
             if(ln.length > 0)
                 await this.sendRawLine('ERROR :'+ln)
+    }
+
+    /**
+     * Sends server info to the client.
+     * Should be sent before MotD and initial mode setting
+     * @param {string} welcomeMsg The welcome message (e.g. "Welcome to the network!")
+     * @param {string} hostMsg The host message (e.g. "Your host is example.com running FunnyServer v12)
+     * @param {string} creationDateMsg The server creation date message (e.g. "This server was created on 2022-07-24T19:35:08.101Z")
+     * @param {string} serverVersion The server version string
+     * @param {string} networkName The network name for the client to display
+     * @returns {Promise<void>}
+     */
+    async sendServerInfo(welcomeMsg, hostMsg, creationDateMsg, serverVersion, networkName) {
+        await this.sendServerMessage(`001 ${this.nickOrAsterisk}`, welcomeMsg)
+        await this.sendServerMessage(`002 ${this.nickOrAsterisk}`, hostMsg)
+        await this.sendServerMessage(`003 ${this.nickOrAsterisk}`, creationDateMsg)
+        await this.sendServerMessage(`004 ${this.nickOrAsterisk} ${this.ircd.hostname} ${serverVersion}`)
+        await this.sendServerMessage(`005 ${this.nickOrAsterisk}`, welcomeMsg)
+        await this.sendServerMessage(`001 ${this.nickOrAsterisk} NETWORK=${networkName} NICKLEN=32 UTF8MAPPING=rfc8265 UTF8ONLY`, 'are supported by this server')
     }
 
     /**
@@ -1122,9 +1143,10 @@ class IrcClient {
      * @param {string} channel The channel (or user if no suffix is present) from which the message came
      * @param {IrcUserInfo} sender The sender's info
      * @param {string} message The message to send
+     * @param {Date|null} sentTime The time the message was sent or null for no particular time (can be used for chat history)
      * @returns {Promise<void>}
      */
-    async sendChatMessage(channel, sender, message) {
+    async sendChatMessage(channel, sender, message, sentTime = null) {
         // Split message by newlines
         const msgs = message.split('\n')
 
@@ -1138,7 +1160,7 @@ class IrcClient {
             while(msg.length > 0) {
                 const toSend = msg.substring(0, 512)
                 msg = msg.substring(toSend.length)
-                await this.sendRawLine(`:${sender.nick}!~u@${sender.hostname} PRIVMSG ${channel} :${toSend}`, true)
+                await this.sendRawLine(`:${sender.nick}!~u@${sender.hostname} PRIVMSG ${channel} :${toSend}`, true, sentTime)
             }
         }
     }
@@ -1192,7 +1214,7 @@ class IrcClient {
      * @returns {Promise<void>}
      */
     async sendUserChangedNick(userInfo, newNick) {
-        await this.sendRawLine(`:${userInfo.nick}!~u@${userInfo.hostname} NICK ${newNick}`)
+        await this.sendRawLine(`:${userInfo.nick}!~u@${userInfo.hostname} NICK ${newNick}`, true)
     }
 
     /**
@@ -1201,7 +1223,29 @@ class IrcClient {
      * @param {string|null} message The rejection message, or null for "Nick is already taken" (defaults to null)
      */
     async sendNickRejected(newNick, message = null) {
-        await this.sendServerMessage(`433 ${this.nickOrAsterisk} ${newNick}`, message || 'Nick is already taken')
+        await this.sendServerMessage(`433 ${this.nickOrAsterisk} ${newNick}`, message || 'Nick is already taken', true)
+    }
+
+    /**
+     * Sends an online users check response to the client
+     * @param {string[]} onlineNicks The list of nicks that are online
+     * @returns {Promise<void>}
+     */
+    async sendOnlineCheckResponse(onlineNicks) {
+        let prefix = `303 ${this.nickOrAsterisk}`
+        if(onlineNicks.length === 1)
+            await this.sendServerMessage(`${prefix} ${onlineNicks[0]}`)
+        else
+            await this.sendServerMessage(prefix, onlineNicks.join(' '))
+    }
+
+    /**
+     * Sends a user online notification to the client
+     * @param {string} nick The nick of the user that just came online
+     * @returns {Promise<void>}
+     */
+    async sendUserOnline(nick) {
+        await this.sendServerMessage(`730 ${this.nickOrAsterisk} ${nick}`)
     }
 
     /**
