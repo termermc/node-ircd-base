@@ -1,9 +1,8 @@
-const net = require('net')
-const Ircd = require('../ircd')
-const { IRCD_CAPS } = require('../constants')
+const Ircd = require('./ircd')
+const { IRCD_CAPS } = require('./constants')
 const carrier = require('carrier');
-const { getCurrentMs, sleep } = require('../util/misc')
-const { genId } = require('../util/idgen')
+const { getCurrentMs, sleep } = require('./util/misc')
+const { genId } = require('./util/idgen')
 
 /**
  * @typedef IrcUserInfo
@@ -11,7 +10,7 @@ const { genId } = require('../util/idgen')
  * @property {string} username The user's username
  * @property {string} realname The user's real name
  * @property {string} hostname The user's hostname (can be real or fake)
- * @property {`${'H'|'G'}${string}`?} status The user's status (optional, e.g. 'H@' for online op, 'G' for away, 'G+' for away voiced, 'H~' for online owner, etc)
+ * @property {`${'H'|'G'}${string}`|string?} status The user's status (optional, e.g. 'H@' for online op, 'G' for away, 'G+' for away voiced, 'H~' for online owner, etc)
  * @since 1.0.0
  */
 

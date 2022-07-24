@@ -1,6 +1,5 @@
-const carrier = require('carrier')
 const net = require('net')
-const IrcClient = require('./class/IrcClient')
+const IrcClient = require('./client')
 
 /**
  * @callback IrcClientConnectHandler
