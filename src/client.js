@@ -1,4 +1,3 @@
-const Ircd = require('./ircd')
 const { IRCD_CAPS } = require('./constants')
 const carrier = require('carrier');
 const { getCurrentMs, sleep } = require('./util/misc')
@@ -146,6 +145,15 @@ const { genId } = require('./util/idgen')
  */
 
 /**
+ * @callback IrcClientKickHandler
+ * @param {string} channel The channel from which the nick is being kicked
+ * @param {string} nick The nick that is being kicked
+ * @param {string|null} reason The kick reason, or null if none
+ * @returns {Promise<void>}
+ * @since 1.0.0
+ */
+
+/**
  * IRC client object
  * @since 1.0.0
  */
@@ -176,7 +184,7 @@ class IrcClient {
 
     /**
      * The underlying network socket for this client
-     * @type {net.Socket}
+     * @type {import('net').Socket}
      * @readonly
      * @since 1.0.0
      */
@@ -315,13 +323,18 @@ class IrcClient {
      * @type {IrcClientBackHandler[]}
      */
     #backHandlers = []
+    /**
+     * Kick handlers
+     * @type {IrcClientKickHandler[]}
+     */
+    #kickHandlers = []
 
     /**
      * Removes a handler from an array of handlers based on its ID
      * @param {any & { id: number }[]} handlers The handlers
      * @param {number} id The handler ID
      */
-    #removeHandler(handlers, id) {
+    static #removeHandler(handlers, id) {
         for(let i = 0; i < handlers.length; i++) {
             if(handlers[i].id === id) {
                 handlers.splice(i, 1)
@@ -345,9 +358,10 @@ class IrcClient {
     /**
      * Removes a disconnect handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnDisconnect(id) {
-        this.#removeHandler(this.#disconnectHandlers, id)
+        IrcClient.#removeHandler(this.#disconnectHandlers, id)
     }
 
     /**
@@ -366,9 +380,10 @@ class IrcClient {
     /**
      * Removes a quit handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnQuit(id) {
-        this.#removeHandler(this.#quitHandlers, id)
+        IrcClient.#removeHandler(this.#quitHandlers, id)
     }
 
     /**
@@ -387,9 +402,10 @@ class IrcClient {
     /**
      * Removes a line handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnLine(id) {
-        this.#removeHandler(this.#lineHandlers, id)
+        IrcClient.#removeHandler(this.#lineHandlers, id)
     }
 
     /**
@@ -409,9 +425,10 @@ class IrcClient {
     /**
      * Removes a login attempt handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnLoginAttempt(id) {
-        this.#removeHandler(this.#loginAttemptHandlers, id)
+        IrcClient.#removeHandler(this.#loginAttemptHandlers, id)
     }
     
     /**
@@ -430,9 +447,10 @@ class IrcClient {
     /**
      * Removes a successful login handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnSuccessfulLogin(id) {
-        this.#removeHandler(this.#successfulLoginHandlers, id)
+        IrcClient.#removeHandler(this.#successfulLoginHandlers, id)
     }
 
     /**
@@ -451,9 +469,10 @@ class IrcClient {
     /**
      * Removes a failed login handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnFailedLogin(id) {
-        this.#removeHandler(this.#failedLoginHandlers, id)
+        IrcClient.#removeHandler(this.#failedLoginHandlers, id)
     }
 
     /**
@@ -472,9 +491,10 @@ class IrcClient {
     /**
      * Removes a socket error handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnSocketError(id) {
-        this.#removeHandler(this.#socketErrorHandlers, id)
+        IrcClient.#removeHandler(this.#socketErrorHandlers, id)
     }
 
     /**
@@ -493,9 +513,10 @@ class IrcClient {
     /**
      * Removes a ping handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnPing(id) {
-        this.#removeHandler(this.#pingHandlers, id)
+        IrcClient.#removeHandler(this.#pingHandlers, id)
     }
 
     /**
@@ -514,9 +535,10 @@ class IrcClient {
     /**
      * Removes an auth timeout handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnAuthTimeout(id) {
-        this.#removeHandler(this.#authTimeoutHandlers, id)
+        IrcClient.#removeHandler(this.#authTimeoutHandlers, id)
     }
 
     /**
@@ -524,6 +546,7 @@ class IrcClient {
      * Online check handlers are called when the user asks to know whether a user is online or not.
      * @param {IrcClientOnlineCheckHandler} handler The handler
      * @returns {number} The handler ID
+     * @since 1.0.0
      */
     onOnlineCheck(handler) {
         handler.id = genId()
@@ -533,9 +556,10 @@ class IrcClient {
     /**
      * Removes an online check handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnOnlineCheck(id) {
-        this.#removeHandler(this.#onlineCheckHandlers, id)
+        IrcClient.#removeHandler(this.#onlineCheckHandlers, id)
     }
 
     /**
@@ -543,6 +567,7 @@ class IrcClient {
      * Join handlers are called when the user tries to join a channel.
      * @param {IrcClientJoinHandler} handler The handler
      * @returns {number} The handler ID
+     * @since 1.0.0
      */
     onJoin(handler) {
         handler.id = genId()
@@ -552,9 +577,10 @@ class IrcClient {
     /**
      * Removes a join handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnJoin(id) {
-        this.#removeHandler(this.#joinHandlers, id)
+        IrcClient.#removeHandler(this.#joinHandlers, id)
     }
 
     /**
@@ -562,6 +588,7 @@ class IrcClient {
      * Part handlers are called when the user tries to part a channel.
      * @param {IrcClientPartHandler} handler The handler
      * @returns {number} The handler ID
+     * @since 1.0.0
      */
     onPart(handler) {
         handler.id = genId()
@@ -571,9 +598,10 @@ class IrcClient {
     /**
      * Removes a part handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnPart(id) {
-        this.#removeHandler(this.#partHandlers, id)
+        IrcClient.#removeHandler(this.#partHandlers, id)
     }
 
     /**
@@ -581,6 +609,7 @@ class IrcClient {
      * Channel info handlers are called when the user requests info about a channel.
      * @param {IrcClientChannelInfoHandler} handler The handler
      * @returns {number} The handler ID
+     * @since 1.0.0
      */
     onChannelInfo(handler) {
         handler.id = genId()
@@ -590,9 +619,10 @@ class IrcClient {
     /**
      * Removes a channel info handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnChannelInfo(id) {
-        this.#removeHandler(this.#channelInfoHandlers, id)
+        IrcClient.#removeHandler(this.#channelInfoHandlers, id)
     }
 
     /**
@@ -600,6 +630,7 @@ class IrcClient {
      * Channel users handlers are called when the user requests a channel's user list.
      * @param {IrcClientChannelUsersHandler} handler The handler
      * @returns {number} The handler ID
+     * @since 1.0.0
      */
     onChannelUsers(handler) {
         handler.id = genId()
@@ -609,9 +640,10 @@ class IrcClient {
     /**
      * Removes a channel users handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnChannelUsers(id) {
-        this.#removeHandler(this.#channelUsersHandlers, id)
+        IrcClient.#removeHandler(this.#channelUsersHandlers, id)
     }
 
     /**
@@ -619,6 +651,7 @@ class IrcClient {
      * Chat message handlers are called when the user sends a chat message, either in a channel or as a private message
      * @param {IrcClientChatMessageHandler} handler The handler
      * @returns {number} The handler ID
+     * @since 1.0.0
      */
     onChatMessage(handler) {
         handler.id = genId()
@@ -628,9 +661,10 @@ class IrcClient {
     /**
      * Removes a chat message handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnChatMessage(id) {
-        this.#removeHandler(this.#chatMessageHandlers, id)
+        IrcClient.#removeHandler(this.#chatMessageHandlers, id)
     }
 
     /**
@@ -647,9 +681,10 @@ class IrcClient {
     /**
      * Removes an away handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnAway(id) {
-        this.#removeHandler(this.#awayHandlers, id)
+        IrcClient.#removeHandler(this.#awayHandlers, id)
     }
 
     /**
@@ -657,6 +692,7 @@ class IrcClient {
      * Back handlers are called when the user marks himself/herself as back (not away)
      * @param {IrcClientBackHandler} handler The handler
      * @returns {number} The handler ID
+     * @since 1.0.0
      */
     onBack(handler) {
         handler.id = genId()
@@ -666,14 +702,36 @@ class IrcClient {
     /**
      * Removes a back handler
      * @param {number} id The handler ID
+     * @since 1.0.0
      */
     removeOnBack(id) {
-        this.#removeHandler(this.#backHandlers, id)
+        IrcClient.#removeHandler(this.#backHandlers, id)
+    }
+
+    /**
+     * Registers a kick handler.
+     * Kick handlers are called when the user kicks a user from a channel
+     * @param {IrcClientKickHandler} handler The handler
+     * @returns {number} The handler ID
+     * @since 1.1.1
+     */
+    onKick(handler) {
+        handler.id = genId()
+        this.#kickHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes a kick handler
+     * @param {number} id The handler ID
+     * @since 1.1.1
+     */
+    removeOnKick(id) {
+        IrcClient.#removeHandler(this.#kickHandlers, id)
     }
     
     /**
      * Creates a new client object
-     * @param {net.Socket} socket The client's socket
+     * @param {import('net').Socket} socket The client's socket
      * @param {Ircd} ircd The IRCd this client is associated with
      * @since 1.0.0
      */
@@ -703,6 +761,7 @@ class IrcClient {
      * Parses the provided IRC client line
      * @param {string} ln The line to parse
      * @returns {IrcClientParsedLine|null} The parsed line or null if the line is malformed
+     * @since 1.0.0
      */
     static parseLine(ln) {
         if(ln.length < 1)
@@ -734,6 +793,7 @@ class IrcClient {
      * Initializes the client.
      * For internal use only; do not call outside of internal library code.
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async initialize() {
         // Periodically ping the client
@@ -817,6 +877,9 @@ class IrcClient {
                                 await IrcClient.#dispatchEvent('away', this.#awayHandlers, [ parsed.content ])
                         } else if(parsed.name === 'ISON') {
                             await IrcClient.#dispatchEvent('online check', this.#onlineCheckHandlers, [ parsed.metadata.split(' ') ])
+                        } else if(parsed.name === 'KICK') {
+                            const [ channel, nick ] = parsed.metadata.split(' ')
+                            await IrcClient.#dispatchEvent('kick', this.#kickHandlers, [ channel, nick, parsed.content ])
                         } else if(parsed.name !== 'PONG' /* <-- skip some commands that aren't handled in here */) { // Unknown commands
                             await this.sendServerMessage(`421 ${this.nickOrAsterisk} ${parsed.name}`, 'Unknown command', true)
                         }
@@ -1023,6 +1086,7 @@ class IrcClient {
      * @param {string} serverVersion The server version string
      * @param {string} networkName The network name for the client to display
      * @returns {Promise<void>}
+     * @since 1.0.0
      */
     async sendServerInfo(welcomeMsg, hostMsg, creationDateMsg, serverVersion, networkName) {
         await this.sendServerMessage(`001 ${this.nickOrAsterisk}`, welcomeMsg)
@@ -1268,6 +1332,41 @@ class IrcClient {
      */
     async sendUserOnline(nick) {
         await this.sendServerMessage(`730 ${this.nickOrAsterisk} ${nick}`)
+    }
+
+    /**
+     * Sends a no such nick message to the client
+     * @param {string} nick The nick that does not exist
+     * @param {string|null} message The message to send, or null for "No such nick" (defaults to null)
+     * @returns {Promise<void>}
+     * @since 1.1.1
+     */
+    async sendNoSuchNick(nick, message = null) {
+        await this.sendServerMessage(`401 ${this.nickOrAsterisk} ${nick}`, message || 'No such nick')
+    }
+
+    /**
+     * Sends a not in channel message to the client
+     * @param {string} channel The channel in question
+     * @param {string|null} message The message to send, or null for "Not in channel" (defaults to null)
+     * @returns {Promise<void>}
+     * @since 1.1.1
+     */
+    async sendNotInChannel(channel, message = null) {
+        await this.sendServerMessage(`441 ${this.nickOrAsterisk} ${channel}`, message || 'Not in channel')
+    }
+
+    /**
+     * Sends a user kicked message to the client
+     * @param {string} nick The nick of the user who was kicked
+     * @param {string} channel The channel from which the user was kicked
+     * @param {IrcUserInfo} kickerInfo The kicker's user info
+     * @param {string|null} message The kick message, or null for none
+     * @returns {Promise<void>}
+     * @since 1.1.1
+     */
+    async sendUserKicked(nick, channel, kickerInfo, message = null) {
+        await this.sendRawLine(`:${kickerInfo.nick}!~u@${kickerInfo.hostname} KICK ${channel} ${nick} ${message || nick}`)
     }
 
     /**
