@@ -150,7 +150,15 @@ const { genId } = require('./util/idgen')
  * @param {string} nick The nick that is being kicked
  * @param {string|null} reason The kick reason, or null if none
  * @returns {Promise<void>}
- * @since 1.0.0
+ * @since 1.1.1
+ */
+
+/**
+ * @callback IrcClientTopicChangeHandler
+ * @param {string} channel The channel that is having its topic changed
+ * @param {string} newTopic The new topic
+ * @returns {Promise<void>}
+ * @since 1.1.1
  */
 
 /**
@@ -328,6 +336,11 @@ class IrcClient {
      * @type {IrcClientKickHandler[]}
      */
     #kickHandlers = []
+    /**
+     * Topic change handlers
+     * @type {IrcClientTopicChangeHandler[]}
+     */
+    #topicChangeHandlers = []
 
     /**
      * Removes a handler from an array of handlers based on its ID
@@ -728,6 +741,27 @@ class IrcClient {
     removeOnKick(id) {
         IrcClient.#removeHandler(this.#kickHandlers, id)
     }
+
+    /**
+     * Registers a topic change handler.
+     * Topic change handlers are called when the user changes a channel topic
+     * @param {IrcClientTopicChangeHandler} handler The handler
+     * @returns {number} The handler ID
+     * @since 1.1.1
+     */
+    onTopicChange(handler) {
+        handler.id = genId()
+        this.#topicChangeHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes a topic change handler
+     * @param {number} id The handler ID
+     * @since 1.1.1
+     */
+    removeOnTopicChange(id) {
+        IrcClient.#removeHandler(this.#topicChangeHandlers, id)
+    }
     
     /**
      * Creates a new client object
@@ -880,6 +914,8 @@ class IrcClient {
                         } else if(parsed.name === 'KICK') {
                             const [ channel, nick ] = parsed.metadata.split(' ')
                             await IrcClient.#dispatchEvent('kick', this.#kickHandlers, [ channel, nick, parsed.content ])
+                        } else if(parsed.name === 'TOPIC') {
+                            await IrcClient.#dispatchEvent('topic change', this.#topicChangeHandlers, [ parsed.metadata, parsed.content ])
                         } else if(parsed.name !== 'PONG' /* <-- skip some commands that aren't handled in here */) { // Unknown commands
                             await this.sendServerMessage(`421 ${this.nickOrAsterisk} ${parsed.name}`, 'Unknown command', true)
                         }
@@ -1358,15 +1394,38 @@ class IrcClient {
 
     /**
      * Sends a user kicked message to the client
-     * @param {string} nick The nick of the user who was kicked
      * @param {string} channel The channel from which the user was kicked
+     * @param {string} nick The nick of the user who was kicked
+     * @param {string|null} reason The kick reason, or null for none
      * @param {IrcUserInfo} kickerInfo The kicker's user info
-     * @param {string|null} message The kick message, or null for none
      * @returns {Promise<void>}
      * @since 1.1.1
      */
-    async sendUserKicked(nick, channel, kickerInfo, message = null) {
-        await this.sendRawLine(`:${kickerInfo.nick}!~u@${kickerInfo.hostname} KICK ${channel} ${nick} ${message || nick}`)
+    async sendUserKicked(channel, nick, kickerInfo, reason = null) {
+        await this.sendRawLine(`:${kickerInfo.nick}!~u@${kickerInfo.hostname} KICK ${channel} ${nick} ${reason || nick}`)
+    }
+
+    /**
+     * Sends a channel topic change to the client
+     * @param {string} channel The channel that had its topic changed
+     * @param {string} newTopic The new topic
+     * @param {IrcUserInfo} changerInfo The info of the user who changed the topic
+     * @returns {Promise<void>}
+     * @since 1.1.1
+     */
+    async sendTopicChanged(channel, newTopic, changerInfo) {
+        await this.sendRawLine(`:${changerInfo.nick}!~u@${changerInfo.hostname} TOPIC ${channel} ${newTopic.includes(' ') ? ' :'+newTopic : newTopic}`)
+    }
+
+    /**
+     * Sends a channel operator required message to the client
+     * @param {string} channel The channel
+     * @param {string|null} message The message, or null for "You must be a channel operator" (defaults to null)
+     * @returns {Promise<void>}
+     * @since 1.1.1
+     */
+    async sendChannelOpsRequired(channel, message = null) {
+        await this.sendServerMessage(`482 ${this.nickOrAsterisk} ${channel}`, message || 'You must be a channel operator')
     }
 
     /**
