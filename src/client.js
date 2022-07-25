@@ -46,7 +46,7 @@ const { genId } = require('./util/idgen')
  * @param {IrcUserInfo} userInfo The user info the client provided
  * @param {string} password The password the client is logged in with (can be null)
  * @param {() => Promise<void>} accept Function to be called signifying that the client's attempt has been accepted
- * @param {() => Promise<void>} deny Function to be called signifying that the client's attempt has been denied
+ * @param {(reason?: string) => Promise<void>} deny Function to be called signifying that the client's attempt has been denied (optionally providing a reason string)
  * @returns {Promise<void>}
  * @since 1.0.0
  */
@@ -63,6 +63,7 @@ const { genId } = require('./util/idgen')
  * @callback IrcClientFailedLoginHandler
  * @param {IrcUserInfo} userInfo The user info the client provided
  * @param {string|null} password The password the client logged in with (or null if no password was provided)
+ * @param {string|null} reason The reason the login failed, or null if none was provided (provided by a login attempt handler)
  * @returns {Promise<void>}
  * @since 1.0.0
  */
@@ -930,22 +931,22 @@ class IrcClient {
 
                             // If all required information is present, create callbacks and result logic
                             let acceptedOrDenied = false
-                            const commonResLogic = async handlers => {
+                            const commonResLogic = async (handlers, reason) => {
                                 acceptedOrDenied = true
 
                                 // Call handlers
                                 for (const handler of handlers)
-                                    await handler(userInfo, authPass)
+                                    await handler(userInfo, authPass, reason)
                             }
                             const accept = async () => {
                                 // Set user info and capabilities
                                 this.userInfo = userInfo
                                 this.capabilities = authCaps
 
-                                await commonResLogic(this.#successfulLoginHandlers)
+                                await commonResLogic(this.#successfulLoginHandlers, undefined)
                             }
-                            const deny = async () => {
-                                await commonResLogic(this.#failedLoginHandlers)
+                            const deny = async (reason) => {
+                                await commonResLogic(this.#failedLoginHandlers, reason || null)
 
                                 // Because the authentication attempt was denied, reset the authentication timeout
                                 authTimeout = setTimeout(authTimeoutFunc, this.ircd.authenticationTimeout)
