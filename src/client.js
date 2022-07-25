@@ -1414,7 +1414,7 @@ class IrcClient {
      * @since 1.1.1
      */
     async sendTopicChanged(channel, newTopic, changerInfo) {
-        await this.sendRawLine(`:${changerInfo.nick}!~u@${changerInfo.hostname} TOPIC ${channel} ${newTopic.includes(' ') ? ' :'+newTopic : newTopic}`)
+        await this.sendRawLine(`:${changerInfo.nick}!~u@${changerInfo.hostname} TOPIC ${channel} ${newTopic.includes(' ') ? ':'+newTopic : newTopic}`)
     }
 
     /**
