@@ -44,7 +44,7 @@ const { genId } = require('./util/idgen')
 /**
  * @callback IrcClientLoginAttemptHandler
  * @param {IrcUserInfo} userInfo The user info the client provided
- * @param {string} password The password the client is logged in with (can be null)
+ * @param {string|null} password The password the client is logged in with (can be null)
  * @param {() => Promise<void>} accept Function to be called signifying that the client's attempt has been accepted
  * @param {(reason?: string) => Promise<void>} deny Function to be called signifying that the client's attempt has been denied (optionally providing a reason string)
  * @returns {Promise<void>}
