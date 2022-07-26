@@ -1049,7 +1049,7 @@ class IrcClient {
                         // Authentication phase logic
                         const authLogic = async () => {
                             // Check if necessary information is available to attempt login
-                            if (authNick === null || authUsername === null || authRealname === null || authCaps === null) {
+                            if (authNick === null || authUsername === null || authCaps === null) {
                                 await this.disconnect('Insufficient information provided to complete login')
                                 return
                             }
