@@ -979,7 +979,7 @@ class IrcClient {
                             const channels = parsed.metadata?.split(',')
                             if(channels)
                                 await IrcClient.#dispatchEvent('join', this.#joinHandlers, [ channels ])
-                        } else if(parsed.name === 'PART') { // CHannel part
+                        } else if(parsed.name === 'PART') { // Channel part
                             const channel = parsed.metadata
                             if(channel)
                                 await IrcClient.#dispatchEvent('part', this.#partHandlers, [ channel, parsed.content ])
