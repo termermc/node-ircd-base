@@ -163,6 +163,23 @@ const { genId } = require('./util/idgen')
  */
 
 /**
+ * @callback IrcClientUserModeChangeHandler
+ * @param {string} channel The channel where the user is
+ * @param {string} nick The user's nick
+ * @param {string[]} addedModes The modes that were added to the user
+ * @param {string[]} removedModes The modes that were removed from the user
+ * @since 1.1.2
+ */
+
+/**
+ * @callback IrcClientChannelModeChangeHandler
+ * @param {string} channel The channel
+ * @param {string[]} addedModes The modes that were added to the user
+ * @param {string[]} removedModes The modes that were removed from the user
+ * @since 1.1.2
+ */
+
+/**
  * IRC client object
  * @since 1.0.0
  */
@@ -342,6 +359,16 @@ class IrcClient {
      * @type {IrcClientTopicChangeHandler[]}
      */
     #topicChangeHandlers = []
+    /**
+     * User mode change handlers
+     * @type {IrcClientUserModeChangeHandler[]}
+     */
+    #userModeChangeHandlers = []
+    /**
+     * Channel mode change handlers
+     * @type {IrcClientChannelModeChangeHandler[]}
+     */
+    #channelModeChangeHandlers = []
 
     /**
      * Removes a handler from an array of handlers based on its ID
@@ -763,6 +790,48 @@ class IrcClient {
     removeOnTopicChange(id) {
         IrcClient.#removeHandler(this.#topicChangeHandlers, id)
     }
+
+    /**
+     * Registers a user mode change handler.
+     * User mode change handlers are called when the user changes a channel user's mode
+     * @param {IrcClientUserModeChangeHandler} handler The handler
+     * @returns {number} The handler ID
+     * @since 1.1.2
+     */
+    onUserModeChange(handler) {
+        handler.id = genId()
+        this.#userModeChangeHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes a user mode change handler
+     * @param {number} id The handler ID
+     * @since 1.1.2
+     */
+    removeOnUserModeChange(id) {
+        IrcClient.#removeHandler(this.#userModeChangeHandlers, id)
+    }
+
+    /**
+     * Registers a channel mode change handler.
+     * User mode change handlers are called when the user changes a channel's mode
+     * @param {IrcClientChannelModeChangeHandler} handler The handler
+     * @returns {number} The handler ID
+     * @since 1.1.2
+     */
+    onChannelModeChange(handler) {
+        handler.id = genId()
+        this.#channelModeChangeHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes a channel mode change handler
+     * @param {number} id The handler ID
+     * @since 1.1.2
+     */
+    removeOnChannelModeChange(id) {
+        IrcClient.#removeHandler(this.#channelModeChangeHandlers, id)
+    }
     
     /**
      * Creates a new client object
@@ -778,7 +847,7 @@ class IrcClient {
     /**
      * Dispatches event handlers
      * @param {string} name The event name
-     * @param {((...any) => Promise<any>)[]} handlers The handlers
+     * @param {((...args: any) => Promise<any>)[]} handlers The handlers
      * @param {any[]} data Data to feed to the handlers
      * @returns {Promise<void>}
      */
@@ -790,6 +859,25 @@ class IrcClient {
                 console.error(`Internal error occurred while calling ${name} handler: `, err)
             }
         }
+    }
+
+    /**
+     * Parses a mode delta string (e.g. "+v") into added and removed mode chars
+     * @param {string} delta The delta string (e.g. "+v")
+     * @returns {[string[], string[]]} A 2-element tuple containing the added mode chars and the removed mode chars
+     */
+    static #parseModeDelta(delta) {
+        if(delta.length < 2)
+            return [ [], [] ]
+
+        const type = delta[0]
+        const chars = delta.substring(1).split('')
+        if(type === '+')
+            return [ chars, [] ]
+        else if(type === '-')
+            return [ [], chars ]
+        else
+            return [ [], [] ]
     }
 
     /**
@@ -896,11 +984,14 @@ class IrcClient {
                             if(channel)
                                 await IrcClient.#dispatchEvent('part', this.#partHandlers, [ channel, parsed.content ])
                         } else if(parsed.name === 'MODE') { // Mode commands
-                            if(parsed.content === null) { // Channel info request
-                                await IrcClient.#dispatchEvent('channel info', this.#channelInfoHandlers, [ parsed.metadata ])
-                            }
+                            const parts = parsed.metadata.split(' ')
 
-                            // TODO Other mode commands
+                            if(parts.length === 1) // Channel info request
+                                await IrcClient.#dispatchEvent('channel info', this.#channelInfoHandlers, [ parts[0] ])
+                            else if(parts.length === 2) // Channel mode change
+                                await IrcClient.#dispatchEvent('channel mode change', this.#channelModeChangeHandlers, [ parts[0], ...IrcClient.#parseModeDelta(parts[1]) ])
+                            else if(parts.length === 3) // Channel user mode change
+                                await IrcClient.#dispatchEvent('user mode change', this.#userModeChangeHandlers, [ parts[0], parts[2], ...IrcClient.#parseModeDelta(parts[1]) ])
                         } else if(parsed.name === 'WHO') { // Channel user list
                             await IrcClient.#dispatchEvent('channel users', this.#channelUsersHandlers, [ parsed.metadata.split(' ')[0] ]) // Doesn't support the full spec, just fetches all users
                         } else if(parsed.name === 'PRIVMSG') { // Message
@@ -1240,13 +1331,13 @@ class IrcClient {
      * Sends a chat message to the client.
      * Messages with newlines or over the message length limit will be broken up and sent as multiple messages.
      * @param {string} channel The channel (or user if no suffix is present) from which the message came
-     * @param {IrcUserInfo} sender The sender's info
+     * @param {IrcUserInfo} senderInfo The sender's info
      * @param {string} message The message to send
      * @param {Date|null} sentTime The time the message was sent or null for no particular time (can be used for chat history)
      * @returns {Promise<void>}
      * @since 1.0.0
      */
-    async sendChatMessage(channel, sender, message, sentTime = null) {
+    async sendChatMessage(channel, senderInfo, message, sentTime = null) {
         // Split message by newlines
         const msgs = message.split('\n')
 
@@ -1427,6 +1518,19 @@ class IrcClient {
      */
     async sendChannelOpsRequired(channel, message = null) {
         await this.sendServerMessage(`482 ${this.nickOrAsterisk} ${channel}`, message || 'You must be a channel operator')
+    }
+
+    /**
+     * Sends a user mode change message to the client
+     * @param {string} channel The channel in which the user's mode changed
+     * @param {string} nick The user whose mode changed
+     * @param {string} mode The mode delta string (e.g. "+v", "-o", "+vo", etc)
+     * @param {IrcUserInfo} changerInfo The changer's info
+     * @returns {Promise<void>}
+     * @since 1.1.2
+     */
+    async sendUserModeChange(channel, nick, mode, changerInfo) {
+        await this.sendRawLine(`:${changerInfo.nick}!~u@${changerInfo.hostname} MODE ${channel} ${mode} ${nick}`)
     }
 
     /**
