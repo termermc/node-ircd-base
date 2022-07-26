@@ -135,9 +135,10 @@ ircd.onConnect(async function(client) {
 	})
 
 	// If the client tries to join the channel (like if the force join didn't work), just send a normal join
-	client.onJoin(function(channel) {
-		if(channel === config.channel)
-			client.sendSelfJoin(channel)
+	client.onJoin(function(channels) {
+		for(const channel of channels)
+			if(channel === config.channel)
+				client.sendSelfJoin(channel)
 	})
 })
 
