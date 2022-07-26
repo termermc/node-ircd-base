@@ -849,7 +849,7 @@ class IrcClient {
      * Invite handlers are called when the user invites another user to a channel
      * @param {IrcClientInviteHandler} handler The handler
      * @returns {number} The handler ID
-     * @since 1.1.4
+     * @since 1.1.5
      */
     onInvite(handler) {
         handler.id = genId()
@@ -859,7 +859,7 @@ class IrcClient {
     /**
      * Removes an invite handler
      * @param {number} id The handler ID
-     * @since 1.1.4
+     * @since 1.1.5
      */
     removeOnInvite(id) {
         IrcClient.#removeHandler(this.#inviteHandlers, id)
