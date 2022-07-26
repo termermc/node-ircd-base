@@ -7,7 +7,7 @@ const { genId } = require('./util/idgen')
  * @typedef IrcUserInfo
  * @property {string} nick The user's nick
  * @property {string} username The user's username
- * @property {string} realname The user's real name
+ * @property {string|null} realname The user's real name
  * @property {string} hostname The user's hostname (can be real or fake)
  * @property {`${'H'|'G'}${string}`|string?} status The user's status (optional, e.g. 'H@' for online op, 'G' for away, 'G+' for away voiced, 'H~' for online owner, etc)
  * @since 1.0.0
@@ -177,6 +177,12 @@ const { genId } = require('./util/idgen')
  * @param {string[]} addedModes The modes that were added to the user
  * @param {string[]} removedModes The modes that were removed from the user
  * @since 1.1.3
+ */
+
+/**
+ * @callback IrcClientInviteHandler
+ * @param {string} nick The nick of the user that is being invited
+ * @param {string} channel The channel the nick is being invited to
  */
 
 /**
@@ -369,6 +375,11 @@ class IrcClient {
      * @type {IrcClientChannelModeChangeHandler[]}
      */
     #channelModeChangeHandlers = []
+    /**
+     * Invite handlers
+     * @type {IrcClientInviteHandler[]}
+     */
+    #inviteHandlers = []
 
     /**
      * Removes a handler from an array of handlers based on its ID
@@ -832,6 +843,27 @@ class IrcClient {
     removeOnChannelModeChange(id) {
         IrcClient.#removeHandler(this.#channelModeChangeHandlers, id)
     }
+
+    /**
+     * Registers an invite handler.
+     * Invite handlers are called when the user invites another user to a channel
+     * @param {IrcClientInviteHandler} handler The handler
+     * @returns {number} The handler ID
+     * @since 1.1.4
+     */
+    onInvite(handler) {
+        handler.id = genId()
+        this.#inviteHandlers.push(handler)
+        return handler.id
+    }
+    /**
+     * Removes an invite handler
+     * @param {number} id The handler ID
+     * @since 1.1.4
+     */
+    removeOnInvite(id) {
+        IrcClient.#removeHandler(this.#inviteHandlers, id)
+    }
     
     /**
      * Creates a new client object
@@ -1001,13 +1033,17 @@ class IrcClient {
                                 await IrcClient.#dispatchEvent('back', this.#backHandlers)
                             else
                                 await IrcClient.#dispatchEvent('away', this.#awayHandlers, [ parsed.content ])
-                        } else if(parsed.name === 'ISON') {
+                        } else if(parsed.name === 'ISON') { // Online check
                             await IrcClient.#dispatchEvent('online check', this.#onlineCheckHandlers, [ parsed.metadata.split(' ') ])
-                        } else if(parsed.name === 'KICK') {
+                        } else if(parsed.name === 'KICK') { // Channel user kick
                             const [ channel, nick ] = parsed.metadata.split(' ')
                             await IrcClient.#dispatchEvent('kick', this.#kickHandlers, [ channel, nick, parsed.content ])
-                        } else if(parsed.name === 'TOPIC') {
+                        } else if(parsed.name === 'TOPIC') { // Channel topic change
                             await IrcClient.#dispatchEvent('topic change', this.#topicChangeHandlers, [ parsed.metadata, parsed.content ])
+                        } else if(parsed.name === 'INVITE') { // Channel invite user
+                            const [ nick, channel ] = parsed.metadata.split(' ')
+                            if(nick && channel)
+                                await IrcClient.#dispatchEvent('invite', this.#inviteHandlers, [ nick, channel ])
                         }
                     } else {
                         // Authentication phase logic
@@ -1065,13 +1101,13 @@ class IrcClient {
                             authNick = parsed.metadata
 
                             // If all metadata is already set, call auth logic
-                            if(authNick !== null && authUsername !== null && authRealname !== null && authCaps !== null)
+                            if(authNick !== null && authUsername !== null && authCaps !== null)
                                 await authLogic()
                         } else if (parsed.name === 'PASS') { // Password command
                             authPass = parsed.metadata
                         } else if (parsed.name === 'USER') { // User info setting command
                             authUsername = parsed.metadata.split(' ')[0] || authNick
-                            authRealname = parsed.content || authUsername
+                            authRealname = parsed.content
                         } else if (parsed.name === 'CAP') { // Capabilities negotiation commands
                             // Parse CAP command
                             const capArgs = parsed.metadata.split(' ')
