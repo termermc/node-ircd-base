@@ -1008,8 +1008,6 @@ class IrcClient {
                             await IrcClient.#dispatchEvent('kick', this.#kickHandlers, [ channel, nick, parsed.content ])
                         } else if(parsed.name === 'TOPIC') {
                             await IrcClient.#dispatchEvent('topic change', this.#topicChangeHandlers, [ parsed.metadata, parsed.content ])
-                        } else if(parsed.name !== 'PONG' /* <-- skip some commands that aren't handled in here */) { // Unknown commands
-                            await this.sendServerMessage(`421 ${this.nickOrAsterisk} ${parsed.name}`, 'Unknown command', true)
                         }
                     } else {
                         // Authentication phase logic
