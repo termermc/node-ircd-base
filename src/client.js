@@ -97,7 +97,7 @@ const { genId } = require('./util/idgen')
 
 /**
  * @callback IrcClientJoinHandler
- * @param {string} channel The name of the channel the client is requesting to join
+ * @param {string[]} channels The names of the channels the client is requesting to join
  * @returns {Promise<void>}
  * @since 1.0.0
  */
@@ -976,9 +976,9 @@ class IrcClient {
                             await IrcClient.#dispatchEvent('ping', this.#pingHandlers, [ pingData ])
                             await this.sendServerMessage(`PONG ${this.ircd.hostname} ${pingData}`, null, true)
                         } else if(parsed.name === 'JOIN') { // Channel join
-                            const channel = parsed.metadata
-                            if(channel)
-                                await IrcClient.#dispatchEvent('join', this.#joinHandlers, [ channel ])
+                            const channels = parsed.metadata?.split(',')
+                            if(channels)
+                                await IrcClient.#dispatchEvent('join', this.#joinHandlers, [ channels ])
                         } else if(parsed.name === 'PART') { // CHannel part
                             const channel = parsed.metadata
                             if(channel)
@@ -1349,7 +1349,7 @@ class IrcClient {
             while(msg.length > 0) {
                 const toSend = msg.substring(0, 512)
                 msg = msg.substring(toSend.length)
-                await this.sendRawLine(`:${sender.nick}!~u@${sender.hostname} PRIVMSG ${channel} :${toSend}`, true, sentTime)
+                await this.sendRawLine(`:${senderInfo.nick}!~u@${senderInfo.hostname} PRIVMSG ${channel} :${toSend}`, true, sentTime)
             }
         }
     }
