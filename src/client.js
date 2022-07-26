@@ -168,7 +168,7 @@ const { genId } = require('./util/idgen')
  * @param {string} nick The user's nick
  * @param {string[]} addedModes The modes that were added to the user
  * @param {string[]} removedModes The modes that were removed from the user
- * @since 1.1.2
+ * @since 1.1.3
  */
 
 /**
@@ -176,7 +176,7 @@ const { genId } = require('./util/idgen')
  * @param {string} channel The channel
  * @param {string[]} addedModes The modes that were added to the user
  * @param {string[]} removedModes The modes that were removed from the user
- * @since 1.1.2
+ * @since 1.1.3
  */
 
 /**
@@ -796,7 +796,7 @@ class IrcClient {
      * User mode change handlers are called when the user changes a channel user's mode
      * @param {IrcClientUserModeChangeHandler} handler The handler
      * @returns {number} The handler ID
-     * @since 1.1.2
+     * @since 1.1.3
      */
     onUserModeChange(handler) {
         handler.id = genId()
@@ -806,7 +806,7 @@ class IrcClient {
     /**
      * Removes a user mode change handler
      * @param {number} id The handler ID
-     * @since 1.1.2
+     * @since 1.1.3
      */
     removeOnUserModeChange(id) {
         IrcClient.#removeHandler(this.#userModeChangeHandlers, id)
@@ -817,7 +817,7 @@ class IrcClient {
      * User mode change handlers are called when the user changes a channel's mode
      * @param {IrcClientChannelModeChangeHandler} handler The handler
      * @returns {number} The handler ID
-     * @since 1.1.2
+     * @since 1.1.3
      */
     onChannelModeChange(handler) {
         handler.id = genId()
@@ -827,7 +827,7 @@ class IrcClient {
     /**
      * Removes a channel mode change handler
      * @param {number} id The handler ID
-     * @since 1.1.2
+     * @since 1.1.3
      */
     removeOnChannelModeChange(id) {
         IrcClient.#removeHandler(this.#channelModeChangeHandlers, id)
@@ -1527,7 +1527,7 @@ class IrcClient {
      * @param {string} mode The mode delta string (e.g. "+v", "-o", "+vo", etc)
      * @param {IrcUserInfo} changerInfo The changer's info
      * @returns {Promise<void>}
-     * @since 1.1.2
+     * @since 1.1.3
      */
     async sendUserModeChange(channel, nick, mode, changerInfo) {
         await this.sendRawLine(`:${changerInfo.nick}!~u@${changerInfo.hostname} MODE ${channel} ${mode} ${nick}`)
