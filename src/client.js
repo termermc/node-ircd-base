@@ -1070,8 +1070,8 @@ class IrcClient {
                         } else if (parsed.name === 'PASS') { // Password command
                             authPass = parsed.metadata
                         } else if (parsed.name === 'USER') { // User info setting command
-                            authUsername = parsed.metadata.split(' ')[0]
-                            authRealname = parsed.content
+                            authUsername = parsed.metadata.split(' ')[0] || authNick
+                            authRealname = parsed.content || authUsername
                         } else if (parsed.name === 'CAP') { // Capabilities negotiation commands
                             // Parse CAP command
                             const capArgs = parsed.metadata.split(' ')
