@@ -56,3 +56,11 @@ All that was required was 38 lines of clean code.
 
 Because all the library provides is an interface for receiving events and interacting with clients, all logic is left to the programmer.
 This provides the programmer with freedom to script their IRC server however they want without having to worry about IRC protocol specifics.
+
+# Support/Contact
+
+If you have any questions or need any help, join #node-ircd-base on irc.rizon.net.
+
+If you spot a bug or are requesting a feature, please open an issue on this repository.
+
+To contact the library author, you can message "termer" on irc.rizon.net, or see my [GitHub profile](https://github.com/termermc) for my email.
