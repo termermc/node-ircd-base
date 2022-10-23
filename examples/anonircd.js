@@ -5,7 +5,7 @@ const config = {
 	/**
 	 * The host to bind to
 	 */
-	host: '127.0.0.1',
+	host: '0.0.0.0',
 	/**
 	 * The port to bind to
 	 */
