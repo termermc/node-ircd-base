@@ -1027,7 +1027,17 @@ class IrcClient {
                         } else if(parsed.name === 'WHO') { // Channel user list
                             await IrcClient.#dispatchEvent('channel users', this.#channelUsersHandlers, [ parsed.metadata.split(' ')[0] ]) // Doesn't support the full spec, just fetches all users
                         } else if(parsed.name === 'PRIVMSG') { // Message
-                            await IrcClient.#dispatchEvent('chat message', this.#chatMessageHandlers, [ parsed.metadata, parsed.content ])
+                            let chan
+                            let content
+
+                            if (parsed.content === null) {
+                                [chan, content] = parsed.metadata.split(' ')
+                            } else {
+                                chan = parsed.metadata
+                                content = parsed.content
+                            }
+
+                            await IrcClient.#dispatchEvent('chat message', this.#chatMessageHandlers, [ chan, content ])
                         } else if(parsed.name === 'AWAY') { // Away/back
                             if(parsed.content === null)
                                 await IrcClient.#dispatchEvent('back', this.#backHandlers)
@@ -1243,7 +1253,7 @@ class IrcClient {
      * Sends server info to the client.
      * Should be sent before MotD and initial mode setting
      * @param {string} welcomeMsg The welcome message (e.g. "Welcome to the network!")
-     * @param {string} hostMsg The host message (e.g. "Your host is example.com running FunnyServer v12)
+     * @param {string} hostMsg The host message (e.g. "Your host is example.com running FunnyServer v12")
      * @param {string} creationDateMsg The server creation date message (e.g. "This server was created on 2022-07-24T19:35:08.101Z")
      * @param {string} serverVersion The server version string
      * @param {string} networkName The network name for the client to display
@@ -1331,7 +1341,7 @@ class IrcClient {
     async sendChannelInfo(channel, topic, creatorInfo, mode, creationDate, users) {
         // Send topic if present
         if(topic !== null)
-            await this.sendServerMessage(`332 ${this.nick} ${channel} ${topic}`, null, true)
+            await this.sendServerMessage(`332 ${this.nick} ${channel}`, topic, true)
 
         const timestamp = Math.floor(creationDate.getTime()/1000)
 
