@@ -1,6 +1,6 @@
 {
   "name": "ircd-base",
-  "version": "1.1.6",
+  "version": "1.2.0",
   "description": "A bare-bones and extensible embedded IRC daemon toolkit for NodeJS",
   "main": "index.js",
   "scripts": {
@@ -16,5 +16,8 @@
   "license": "MIT",
   "dependencies": {
     "carrier": "^0.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.4.2"
   }
 }
