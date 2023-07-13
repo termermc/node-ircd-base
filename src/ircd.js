@@ -7,7 +7,7 @@
 /**
  * @callback IrcClientConnectHandler
  * @param {IrcClient} client The client that connected
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
@@ -28,7 +28,21 @@ try {
 }
 
 /**
- * Main IRCd class
+ * Main IRC server class.
+ * Contains all IRC server state, including connected and authenticated clients.
+ *
+ * To start the server, use {@link listen}, or create your own {@link Server} and provide the class' {@link socketHandler} as its callback.
+ *
+ * @example Using your own {@link Server}
+ * ```js
+ * const { Ircd } = require('ircd-base')
+ * const { createServer } = require('node:net')
+ *
+ * const ircd = new Ircd('my.server')
+ * const server = createServer(ircd.socketHandler.bind(ircd))
+ * server.listen('6667', '127.0.0.1')
+ * ```
+ *
  * @since 1.0.0
  */
 class Ircd {
@@ -92,10 +106,14 @@ class Ircd {
     }
 
     /**
-     * Handler for connecting sockets
+     * Handler for incoming socket connections.
+     * .
+     * You only need to use this if you're managing your own {@link Server}.
+     * If you don't know if you need to use this, then you don't, and will need to use {@link listen} to start the server.
      * @param {Socket} sock The socket
+     * @since 1.2.0
      */
-    async #socketHandler(sock) {
+    async socketHandler(sock) {
         // Create client object
         const client = new IrcClient(sock, this)
 
@@ -136,7 +154,11 @@ class Ircd {
      * If TLS options are provided, the server will listen with TLS.
      * This method may be called multiple times on the same server to listen on multiple ports and interfaces.
      *
-     * If you need control over the underlying {@link Server} instance, use {@link listenWithServer} instead.
+     * If you need control over the underlying {@link Server} instance, you can create your own server and
+     * use the {@link socketHandler} method as its callback.
+     * Just make sure you either use `.bind(this)` on the method or wrap a call to it in an anonymous function.
+     *
+     * See the {@link Ircd} class' JSDoc for more information on using your own {@link Server}.
      * @param {number} port The port to listen on
      * @param {string} [host='127.0.0.1'] The host to listen on (defaults to `'127.0.0.1'`)
      * @param {IrcdTlsOptions | null} [tlsOptions=null] TLS options, or null not to listen with TLS (defaults to null)
@@ -148,7 +170,7 @@ class Ircd {
         /** @type {import('node:net').Server} */
         let server
         if (tlsOptions === null) { // No TLS options provided; create plaintext server
-            server = createServer(sock => this.#socketHandler(sock))
+            server = createServer(this.socketHandler.bind(this))
         } else { // TLS options provided; create TLS server
             // Check for TLS support
             if(tls === null)
@@ -159,23 +181,9 @@ class Ircd {
             const cert = await readFile(tlsOptions.certPath)
 
             // Create TLS-enabled server
-            server = tls.createServer({ key, cert }, sock => this.#socketHandler(sock))
+            server = tls.createServer({ key, cert }, this.socketHandler.bind(this))
         }
 
-        await this.listenWithServer(port, host, server)
-    }
-
-    /**
-     * Listens on the specified port, and optionally host.
-     * Uses the provided {@link Server} instance.
-     * If you don't need to provide your own, use the {@link listen} function instead.
-     * @param port {number} port The port to listen on
-     * @param host {string} [host='127.0.0.1'] The host to listen on (defaults to `'127.0.0.1'`)
-     * @param {Server} server The {@link Server} instance to listen with
-     * @public
-     * @returns {Promise<void>}
-     */
-    async listenWithServer(port, host = '127.0.0.1', server) {
         await new Promise((res, _rej) => server.listen(port, host, /** @type {() => void} */ (res)))
     }
 
