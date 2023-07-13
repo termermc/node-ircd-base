@@ -1,5 +1,5 @@
 # node-ircd-base
-A Node.js library for implementing IRC servers using a simple API
+A typesafe Node.js library for implementing IRC servers using a simple API
 
 # Install
 To install it in your project, run `npm install ircd-base` or `yarn add ircd-base`.
@@ -14,9 +14,8 @@ To show the capabilities of the library check out the following example:
 const Ircd = require('./src/ircd')
 
 // Start a basic development server that displays the capabilities of the library
-const ircd = new Ircd()
-
-ircd.hostname = 'my.network'
+// The server's cosmetic hostname will be 'my-network' (doesn't affect where the server listens)
+const ircd = new Ircd('my.network')
 
 ircd.onConnect(async function(client) {
     console.log('Client connected')

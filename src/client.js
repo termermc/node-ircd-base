@@ -1,7 +1,7 @@
 const { IRCD_CAPS } = require('./constants')
+// @ts-expect-error
 const carrier = require('carrier');
-const { getCurrentMs, sleep } = require('./util/misc')
-const { genId } = require('./util/idgen')
+const { sleep } = require('./util/misc')
 
 /**
  * @typedef IrcUserInfo
@@ -23,21 +23,21 @@ const { genId } = require('./util/idgen')
 
 /**
  * @callback IrcClientDisconnectHandler
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
 /**
  * @callback IrcClientQuitHandler
  * @param {string|null} message The quit message, or null if there was none
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
 /**
  * @callback IrcClientLineHandler
  * @param {IrcClientParsedLine} line The parsed line
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
@@ -47,7 +47,7 @@ const { genId } = require('./util/idgen')
  * @param {string|null} password The password the client is logged in with (can be null)
  * @param {() => Promise<void>} accept Function to be called signifying that the client's attempt has been accepted
  * @param {(reason?: string) => Promise<void>} deny Function to be called signifying that the client's attempt has been denied (optionally providing a reason string)
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
@@ -55,7 +55,7 @@ const { genId } = require('./util/idgen')
  * @callback IrcClientSuccessfulLoginHandler
  * @param {IrcUserInfo} userInfo The user info the client provided
  * @param {string|null} password The password the client logged in with (or null if no password was provided)
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
@@ -64,41 +64,41 @@ const { genId } = require('./util/idgen')
  * @param {IrcUserInfo} userInfo The user info the client provided
  * @param {string|null} password The password the client logged in with (or null if no password was provided)
  * @param {string|null} reason The reason the login failed, or null if none was provided (provided by a login attempt handler)
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
 /**
  * @callback IrcClientSocketErrorHandler
  * @param {Error} error The error that occurred
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
 /**
  * @callback IrcClientPingHandler
  * @param {string} data The data sent by the client to be repeated by the server
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
 /**
  * @callback IrcClientAuthTimeoutHandler
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
 /**
  * @callback IrcClientOnlineCheckHandler
  * @param {string[]} nicks An array of nicks the client is requesting to check for
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
 /**
  * @callback IrcClientJoinHandler
  * @param {string[]} channels The names of the channels the client is requesting to join
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
@@ -106,21 +106,21 @@ const { genId } = require('./util/idgen')
  * @callback IrcClientPartHandler
  * @param {string} channel The name of the channel the client is requesting to part
  * @param {string|null} reason The part reason, or null if none
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
 /**
  * @callback IrcClientChannelInfoHandler
  * @param {string} channel The name of the channel the client is requesting info for
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
 /**
  * @callback IrcClientChannelUsersHandler
  * @param {string} channel The name of the channel the client is requesting users for
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
@@ -128,20 +128,20 @@ const { genId } = require('./util/idgen')
  * @callback IrcClientChatMessageHandler
  * @param {string} channel The channel (or nick, if there is no prefix) in which the client sent the message
  * @param {string} message The chat message
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
 /**
  * @callback IrcClientAwayHandler
  * @param {string} message The away message
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
 /**
  * @callback IrcClientBackHandler
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.0.0
  */
 
@@ -150,7 +150,7 @@ const { genId } = require('./util/idgen')
  * @param {string} channel The channel from which the nick is being kicked
  * @param {string} nick The nick that is being kicked
  * @param {string|null} reason The kick reason, or null if none
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.1.1
  */
 
@@ -158,7 +158,7 @@ const { genId } = require('./util/idgen')
  * @callback IrcClientTopicChangeHandler
  * @param {string} channel The channel that is having its topic changed
  * @param {string} newTopic The new topic
- * @returns {Promise<void>}
+ * @returns {Promise<void> | void}
  * @since 1.1.1
  */
 
@@ -168,6 +168,7 @@ const { genId } = require('./util/idgen')
  * @param {string} nick The user's nick
  * @param {string[]} addedModes The modes that were added to the user
  * @param {string[]} removedModes The modes that were removed from the user
+ * @returns {Promise<void> | void}
  * @since 1.1.3
  */
 
@@ -176,6 +177,7 @@ const { genId } = require('./util/idgen')
  * @param {string} channel The channel
  * @param {string[]} addedModes The modes that were added to the user
  * @param {string[]} removedModes The modes that were removed from the user
+ * @returns {Promise<void> | void}
  * @since 1.1.3
  */
 
@@ -183,6 +185,7 @@ const { genId } = require('./util/idgen')
  * @callback IrcClientInviteHandler
  * @param {string} nick The nick of the user that is being invited
  * @param {string} channel The channel the nick is being invited to
+ * @returns {Promise<void> | void}
  */
 
 /**
@@ -208,7 +211,7 @@ class IrcClient {
 
     /**
      * The IRCd this client is connected to
-     * @type {Ircd}
+     * @type {import('./ircd')}
      * @readonly
      * @since 1.0.0
      */
@@ -382,13 +385,13 @@ class IrcClient {
     #inviteHandlers = []
 
     /**
-     * Removes a handler from an array of handlers based on its ID
-     * @param {any & { id: number }[]} handlers The handlers
-     * @param {number} id The handler ID
+     * Removes a handler from an array of handlers
+     * @param {function[]} handlers The handlers
+     * @param {function} handler The handler
      */
-    static #removeHandler(handlers, id) {
-        for(let i = 0; i < handlers.length; i++) {
-            if(handlers[i].id === id) {
+    static #removeHandler(handlers, handler) {
+        for (let i = 0; i < handlers.length; i++) {
+            if (handlers[i] === handler) {
                 handlers.splice(i, 1)
                 break;
             }
@@ -399,21 +402,18 @@ class IrcClient {
      * Registers a disconnect handler.
      * Disconnect handlers are the last event to be called on a client.
      * @param {IrcClientDisconnectHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onDisconnect(handler) {
-        handler.id = genId()
         this.#disconnectHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a disconnect handler
-     * @param {number} id The handler ID
+     * @param {IrcClientDisconnectHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnDisconnect(id) {
-        IrcClient.#removeHandler(this.#disconnectHandlers, id)
+    removeOnDisconnect(handler) {
+        IrcClient.#removeHandler(this.#disconnectHandlers, handler)
     }
 
     /**
@@ -421,21 +421,18 @@ class IrcClient {
      * Quit handlers are called when the client sends a QUIT message and is disconnected.
      * Called before onDisconnect, and may not be called at all if the connection was closed without a QUIT message being sent
      * @param {IrcClientQuitHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onQuit(handler) {
-        handler.id = genId()
         this.#quitHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a quit handler
-     * @param {number} id The handler ID
+     * @param {IrcClientQuitHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnQuit(id) {
-        IrcClient.#removeHandler(this.#quitHandlers, id)
+    removeOnQuit(handler) {
+        IrcClient.#removeHandler(this.#quitHandlers, handler)
     }
 
     /**
@@ -443,21 +440,18 @@ class IrcClient {
      * Line handlers are called when the client sends a line, and before it is handled by the server.
      * Since server logic must wait for all line handlers, avoid slow logic unless absolutely necessary.
      * @param {IrcClientLineHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onLine(handler) {
-        handler.id = genId()
         this.#lineHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a line handler
-     * @param {number} id The handler ID
+     * @param {IrcClientLineHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnLine(id) {
-        IrcClient.#removeHandler(this.#lineHandlers, id)
+    removeOnLine(handler) {
+        IrcClient.#removeHandler(this.#lineHandlers, handler)
     }
 
     /**
@@ -466,21 +460,18 @@ class IrcClient {
      * Note that once a handler has called accept() or deny(), no other handlers will be called.
      * Ideally only one handler will be registered to avoid confusing situations.
      * @param {IrcClientLoginAttemptHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onLoginAttempt(handler) {
-        handler.id = genId()
         this.#loginAttemptHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a login attempt handler
-     * @param {number} id The handler ID
+     * @param {IrcClientLoginAttemptHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnLoginAttempt(id) {
-        IrcClient.#removeHandler(this.#loginAttemptHandlers, id)
+    removeOnLoginAttempt(handler) {
+        IrcClient.#removeHandler(this.#loginAttemptHandlers, handler)
     }
     
     /**
@@ -488,21 +479,18 @@ class IrcClient {
      * Successful login handlers are called when the client successfully logs in.
      * IMPORTANT: It is the obligation of the programmer to send the server info, send the MotD, and set the client's mode after a successful login to let the client know that it is now properly authenticated.
      * @param {IrcClientSuccessfulLoginHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onSuccessfulLogin(handler) {
-        handler.id = genId()
         this.#successfulLoginHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a successful login handler
-     * @param {number} id The handler ID
+     * @param {IrcClientSuccessfulLoginHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnSuccessfulLogin(id) {
-        IrcClient.#removeHandler(this.#successfulLoginHandlers, id)
+    removeOnSuccessfulLogin(handler) {
+        IrcClient.#removeHandler(this.#successfulLoginHandlers, handler)
     }
 
     /**
@@ -510,21 +498,18 @@ class IrcClient {
      * Failed login handlers are called when the client failed a login attempt.
      * The login process is restarted after this point (although negotiated values are still temporarily held), but the programmer has the option of simply disconnecting the client or issuing a taken nick message.
      * @param {IrcClientFailedLoginHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onFailedLogin(handler) {
-        handler.id = genId()
         this.#failedLoginHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a failed login handler
-     * @param {number} id The handler ID
+     * @param {IrcClientFailedLoginHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnFailedLogin(id) {
-        IrcClient.#removeHandler(this.#failedLoginHandlers, id)
+    removeOnFailedLogin(handler) {
+        IrcClient.#removeHandler(this.#failedLoginHandlers, handler)
     }
 
     /**
@@ -532,21 +517,18 @@ class IrcClient {
      * Socket error handlers are called when an error occurs on in socket connection.
      * May or may not be fatal; if it was fatal, disconnect handlers will be called after this.
      * @param {IrcClientSocketErrorHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onSocketError(handler) {
-        handler.id = genId()
         this.#socketErrorHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a socket error handler
-     * @param {number} id The handler ID
+     * @param {IrcClientSocketErrorHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnSocketError(id) {
-        IrcClient.#removeHandler(this.#socketErrorHandlers, id)
+    removeOnSocketError(handler) {
+        IrcClient.#removeHandler(this.#socketErrorHandlers, handler)
     }
 
     /**
@@ -554,21 +536,18 @@ class IrcClient {
      * Ping handlers are called when the client sends a ping request.
      * Handlers are called before the server responds, so if handlers are slow then it will reflect badly on the server's ping time.
      * @param {IrcClientPingHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onPing(handler) {
-        handler.id = genId()
         this.#pingHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a ping handler
-     * @param {number} id The handler ID
+     * @param {IrcClientPingHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnPing(id) {
-        IrcClient.#removeHandler(this.#pingHandlers, id)
+    removeOnPing(handler) {
+        IrcClient.#removeHandler(this.#pingHandlers, handler)
     }
 
     /**
@@ -576,299 +555,257 @@ class IrcClient {
      * Auth timeout handlers are called when the client fails to authenticate within a specified period of time.
      * Disconnect handlers are called afterwards.
      * @param {IrcClientAuthTimeoutHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onAuthTimeout(handler) {
-        handler.id = genId()
         this.#authTimeoutHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes an auth timeout handler
-     * @param {number} id The handler ID
+     * @param {IrcClientAuthTimeoutHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnAuthTimeout(id) {
-        IrcClient.#removeHandler(this.#authTimeoutHandlers, id)
+    removeOnAuthTimeout(handler) {
+        IrcClient.#removeHandler(this.#authTimeoutHandlers, handler)
     }
 
     /**
      * Registers an online check handler.
      * Online check handlers are called when the user asks to know whether a user is online or not.
      * @param {IrcClientOnlineCheckHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onOnlineCheck(handler) {
-        handler.id = genId()
         this.#onlineCheckHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes an online check handler
-     * @param {number} id The handler ID
+     * @param {IrcClientOnlineCheckHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnOnlineCheck(id) {
-        IrcClient.#removeHandler(this.#onlineCheckHandlers, id)
+    removeOnOnlineCheck(handler) {
+        IrcClient.#removeHandler(this.#onlineCheckHandlers, handler)
     }
 
     /**
      * Registers a join handler.
      * Join handlers are called when the user tries to join a channel.
      * @param {IrcClientJoinHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onJoin(handler) {
-        handler.id = genId()
         this.#joinHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a join handler
-     * @param {number} id The handler ID
+     * @param {IrcClientJoinHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnJoin(id) {
-        IrcClient.#removeHandler(this.#joinHandlers, id)
+    removeOnJoin(handler) {
+        IrcClient.#removeHandler(this.#joinHandlers, handler)
     }
 
     /**
      * Registers a part handler.
      * Part handlers are called when the user tries to part a channel.
      * @param {IrcClientPartHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onPart(handler) {
-        handler.id = genId()
         this.#partHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a part handler
-     * @param {number} id The handler ID
+     * @param {IrcClientPartHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnPart(id) {
-        IrcClient.#removeHandler(this.#partHandlers, id)
+    removeOnPart(handler) {
+        IrcClient.#removeHandler(this.#partHandlers, handler)
     }
 
     /**
      * Registers a channel info handler.
      * Channel info handlers are called when the user requests info about a channel.
      * @param {IrcClientChannelInfoHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onChannelInfo(handler) {
-        handler.id = genId()
         this.#channelInfoHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a channel info handler
-     * @param {number} id The handler ID
+     * @param {IrcClientChannelInfoHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnChannelInfo(id) {
-        IrcClient.#removeHandler(this.#channelInfoHandlers, id)
+    removeOnChannelInfo(handler) {
+        IrcClient.#removeHandler(this.#channelInfoHandlers, handler)
     }
 
     /**
      * Registers a channel users handler.
      * Channel users handlers are called when the user requests a channel's user list.
      * @param {IrcClientChannelUsersHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onChannelUsers(handler) {
-        handler.id = genId()
         this.#channelUsersHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a channel users handler
-     * @param {number} id The handler ID
+     * @param {IrcClientChannelUsersHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnChannelUsers(id) {
-        IrcClient.#removeHandler(this.#channelUsersHandlers, id)
+    removeOnChannelUsers(handler) {
+        IrcClient.#removeHandler(this.#channelUsersHandlers, handler)
     }
 
     /**
      * Registers a chat message handler.
      * Chat message handlers are called when the user sends a chat message, either in a channel or as a private message
      * @param {IrcClientChatMessageHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onChatMessage(handler) {
-        handler.id = genId()
         this.#chatMessageHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a chat message handler
-     * @param {number} id The handler ID
+     * @param {IrcClientChatMessageHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnChatMessage(id) {
-        IrcClient.#removeHandler(this.#chatMessageHandlers, id)
+    removeOnChatMessage(handler) {
+        IrcClient.#removeHandler(this.#chatMessageHandlers, handler)
     }
 
     /**
      * Registers an away handler.
      * Away handlers are called when the user marks himself/herself as away
      * @param {IrcClientAwayHandler} handler The handler
-     * @returns {number} The handler ID
      */
     onAway(handler) {
-        handler.id = genId()
         this.#awayHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes an away handler
-     * @param {number} id The handler ID
+     * @param {IrcClientAwayHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnAway(id) {
-        IrcClient.#removeHandler(this.#awayHandlers, id)
+    removeOnAway(handler) {
+        IrcClient.#removeHandler(this.#awayHandlers, handler)
     }
 
     /**
      * Registers a back handler.
      * Back handlers are called when the user marks himself/herself as back (not away)
      * @param {IrcClientBackHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.0.0
      */
     onBack(handler) {
-        handler.id = genId()
         this.#backHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a back handler
-     * @param {number} id The handler ID
+     * @param {IrcClientBackHandler} handler The handler
      * @since 1.0.0
      */
-    removeOnBack(id) {
-        IrcClient.#removeHandler(this.#backHandlers, id)
+    removeOnBack(handler) {
+        IrcClient.#removeHandler(this.#backHandlers, handler)
     }
 
     /**
      * Registers a kick handler.
      * Kick handlers are called when the user kicks a user from a channel
      * @param {IrcClientKickHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.1.1
      */
     onKick(handler) {
-        handler.id = genId()
         this.#kickHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a kick handler
-     * @param {number} id The handler ID
+     * @param {IrcClientKickHandler} handler The handler
      * @since 1.1.1
      */
-    removeOnKick(id) {
-        IrcClient.#removeHandler(this.#kickHandlers, id)
+    removeOnKick(handler) {
+        IrcClient.#removeHandler(this.#kickHandlers, handler)
     }
 
     /**
      * Registers a topic change handler.
      * Topic change handlers are called when the user changes a channel topic
      * @param {IrcClientTopicChangeHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.1.1
      */
     onTopicChange(handler) {
-        handler.id = genId()
         this.#topicChangeHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a topic change handler
-     * @param {number} id The handler ID
+     * @param {IrcClientTopicChangeHandler} handler The handler
      * @since 1.1.1
      */
-    removeOnTopicChange(id) {
-        IrcClient.#removeHandler(this.#topicChangeHandlers, id)
+    removeOnTopicChange(handler) {
+        IrcClient.#removeHandler(this.#topicChangeHandlers, handler)
     }
 
     /**
      * Registers a user mode change handler.
      * User mode change handlers are called when the user changes a channel user's mode
      * @param {IrcClientUserModeChangeHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.1.3
      */
     onUserModeChange(handler) {
-        handler.id = genId()
         this.#userModeChangeHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a user mode change handler
-     * @param {number} id The handler ID
+     * @param {IrcClientUserModeChangeHandler} handler The handler
      * @since 1.1.3
      */
-    removeOnUserModeChange(id) {
-        IrcClient.#removeHandler(this.#userModeChangeHandlers, id)
+    removeOnUserModeChange(handler) {
+        IrcClient.#removeHandler(this.#userModeChangeHandlers, handler)
     }
 
     /**
      * Registers a channel mode change handler.
      * User mode change handlers are called when the user changes a channel's mode
      * @param {IrcClientChannelModeChangeHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.1.3
      */
     onChannelModeChange(handler) {
-        handler.id = genId()
         this.#channelModeChangeHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes a channel mode change handler
-     * @param {number} id The handler ID
+     * @param {IrcClientChannelModeChangeHandler} handler The handler
      * @since 1.1.3
      */
-    removeOnChannelModeChange(id) {
-        IrcClient.#removeHandler(this.#channelModeChangeHandlers, id)
+    removeOnChannelModeChange(handler) {
+        IrcClient.#removeHandler(this.#channelModeChangeHandlers, handler)
     }
 
     /**
      * Registers an invite handler.
      * Invite handlers are called when the user invites another user to a channel
      * @param {IrcClientInviteHandler} handler The handler
-     * @returns {number} The handler ID
      * @since 1.1.5
      */
     onInvite(handler) {
-        handler.id = genId()
         this.#inviteHandlers.push(handler)
-        return handler.id
     }
     /**
      * Removes an invite handler
-     * @param {number} id The handler ID
+     * @param {IrcClientInviteHandler} handler The handler
      * @since 1.1.5
      */
-    removeOnInvite(id) {
-        IrcClient.#removeHandler(this.#inviteHandlers, id)
+    removeOnInvite(handler) {
+        IrcClient.#removeHandler(this.#inviteHandlers, handler)
     }
     
     /**
      * Creates a new client object
      * @param {import('net').Socket} socket The client's socket
-     * @param {Ircd} ircd The IRCd this client is associated with
+     * @param {import('./ircd')} ircd The IRCd this client is associated with
      * @since 1.0.0
      */
     constructor(socket, ircd) {
@@ -879,7 +816,7 @@ class IrcClient {
     /**
      * Dispatches event handlers
      * @param {string} name The event name
-     * @param {((...args: any) => Promise<any>)[]} handlers The handlers
+     * @param {((...args: any) => Promise<any> | void)[]} handlers The handlers
      * @param {any[]} data Data to feed to the handlers
      * @returns {Promise<void>}
      */
@@ -966,10 +903,15 @@ class IrcClient {
         const sendMalformedLnErr = () => this.sendError('Malformed line received')
 
         // Unfinished user info awaiting completion (only using during the authentication stage)
+        /** @type {string | null} */
         let authNick = null
+        /** @type {string | null} */
         let authUsername = null
+        /** @type {string | null} */
         let authRealname = null
+        /** @type {string | null} */
         let authPass = null
+        /** @type {string[] | null} */
         let authCaps = null
         let authCapsEnded = false
 
@@ -982,7 +924,7 @@ class IrcClient {
 
         // Setup line reader
         const carry = carrier.carry(this.socket)
-        carry.on('line', async ln => {
+        carry.on('line', async (/** @type {string} */ ln) => {
             try {
                 const parsed = IrcClient.parseLine(ln)
                 if (parsed === null) {
@@ -1066,6 +1008,11 @@ class IrcClient {
 
                             // If all required information is present, create callbacks and result logic
                             let acceptedOrDenied = false
+                            /**
+                             * @param {IrcClientFailedLoginHandler[]} handlers
+                             * @param {string} reason
+                             * @returns {Promise<void>}
+                             */
                             const commonResLogic = async (handlers, reason) => {
                                 acceptedOrDenied = true
 
@@ -1075,11 +1022,17 @@ class IrcClient {
                             }
                             const accept = async () => {
                                 // Set user info and capabilities
+                                // @ts-expect-error
                                 this.userInfo = userInfo
+                                // @ts-expect-error
                                 this.capabilities = authCaps
 
                                 await commonResLogic(this.#successfulLoginHandlers, undefined)
                             }
+                            /**
+                             * @param {string} reason
+                             * @returns {Promise<void>}
+                             */
                             const deny = async (reason) => {
                                 await commonResLogic(this.#failedLoginHandlers, reason || null)
 
@@ -1095,7 +1048,8 @@ class IrcClient {
                                 nick: authNick,
                                 username: authUsername,
                                 realname: authRealname,
-                                hostname: this.ircd.hostname
+                                hostname: this.ircd.hostname,
+                                status: '',
                             }
 
                             // Clear auth timeout to avoid authentication logic being interrupted
@@ -1618,24 +1572,28 @@ class IrcClient {
      * @since 1.0.0
      */
     async ping() {
-        const start = getCurrentMs()
+        const start = Date.now()
 
         // Send ping
         const pingData = start.toString()
         await this.sendServerMessage('PING '+pingData)
 
         await new Promise((res, _rej) => {
-            let handlerId
-            handlerId = this.onLine(ln => {
+            /** @type {IrcClientLineHandler} */
+            let handler
+
+            handler = ln => {
                 if(ln.name === 'PONG' && ln.metadata === pingData) {
-                    this.removeOnLine(handlerId)
+                    this.removeOnLine(handler)
                     this.lastPingDate = new Date()
                 }
                 res()
-            })
+            }
+
+            this.onLine(handler)
         })
 
-        return getCurrentMs()-start
+        return Date.now() - start
     }
 }
 

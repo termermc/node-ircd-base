@@ -1,6 +1,6 @@
 /**
  * Capabilities supported by the IRCd framework
- * @type {string[]}
+ * @constant
  */
 const IRCD_CAPS = ['server-time', 'away-notify', 'chghost', 'invite-notify', 'multi-prefix', 'userhost-in-names']
 
