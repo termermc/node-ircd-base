@@ -1,14 +1,8 @@
-const net = require('net')
-const { readFile } = require('fs/promises')
-const IrcClient = require('./client')
-
-// Check for TLS support
-let tls = null
-try {
-    tls = require('tls')
-} catch(err) {
-    // TLS support is not available
-}
+/**
+ * @typedef IrcdTlsOptions Options for initializing an IRCd using TLS
+ * @property {string} keyPath The path to the key file
+ * @property {string} certPath The path to the certificate file
+ */
 
 /**
  * @callback IrcClientConnectHandler
@@ -16,6 +10,22 @@ try {
  * @returns {Promise<void>}
  * @since 1.0.0
  */
+
+const { createServer } = require('node:net')
+const { readFile } = require('node:fs/promises')
+const IrcClient = require('./client')
+
+/** @typedef {import('node:net').Server} Server */
+/** @typedef {import('node:net').Socket} Socket */
+
+// Check for TLS support
+/** @type {typeof import('node:tls') | null} */
+let tls = null
+try {
+    tls = require('node:tls')
+} catch(err) {
+    // TLS support is not available
+}
 
 /**
  * Main IRCd class
@@ -27,6 +37,7 @@ class Ircd {
      * This includes unauthenticated clients.
      * @type {IrcClient[]}
      * @readonly
+     * @public
      * @since 1.0.0
      */
     connectedClients = []
@@ -34,6 +45,7 @@ class Ircd {
      * All authenticated clients
      * @type {IrcClient[]}
      * @readonly
+     * @public
      * @since 1.0.0
      */
     authenticatedClients = []
@@ -42,6 +54,7 @@ class Ircd {
      * The server's hostname.
      * Does not affect where the server listens, is only cosmetic.
      * @type {string}
+     * @public
      * @since 1.0.0
      */
     hostname
@@ -55,6 +68,7 @@ class Ircd {
     /**
      * The time before a client connection is closed for not authenticating (in milliseconds)
      * @type {number}
+     * @public
      * @since 1.0.0
      */
     authenticationTimeout = 10_000
@@ -62,6 +76,7 @@ class Ircd {
     /**
      * The period of time between proactively pinging clients
      * @type {number}
+     * @public
      * @since 1.0.0
      */
     clientPingPeriod = 10_000
@@ -69,6 +84,7 @@ class Ircd {
     /**
      * Creates a new IRCd
      * @param {string} hostname The hostname to use for server messages (does not affect bind host)
+     * @public
      * @since 1.0.0
      */
     constructor(hostname) {
@@ -77,7 +93,7 @@ class Ircd {
 
     /**
      * Handler for connecting sockets
-     * @param {net.Socket} sock The socket
+     * @param {Socket} sock The socket
      */
     async #socketHandler(sock) {
         // Create client object
@@ -116,18 +132,23 @@ class Ircd {
 
     /**
      * Listens on the specified port, and optionally host.
+     *
      * If TLS options are provided, the server will listen with TLS.
      * This method may be called multiple times on the same server to listen on multiple ports and interfaces.
+     *
+     * If you need control over the underlying {@link Server} instance, use {@link listenWithServer} instead.
      * @param {number} port The port to listen on
-     * @param {string|null} host The host to listen on, or null to bind on the local interface (defaults to null)
-     * @param {{ keyPath: string, certPath: string }|null} tlsOptions TLS options (keyPath: the path to the key file, certPath: the path to the cert file), or null not to listen with TLS (defaults to null)
+     * @param {string} [host='127.0.0.1'] The host to listen on (defaults to `'127.0.0.1'`)
+     * @param {IrcdTlsOptions | null} [tlsOptions=null] TLS options, or null not to listen with TLS (defaults to null)
      * @returns {Promise<void>}
+     * @public
      * @since 1.0.0
      */
-    async listen(port, host = null, tlsOptions = null) {
+    async listen(port, host = '127.0.0.1', tlsOptions = null) {
+        /** @type {import('node:net').Server} */
         let server
-        if(tlsOptions === null) { // No TLS options provided; create plaintext server
-            server = net.createServer(sock => this.#socketHandler(sock))
+        if (tlsOptions === null) { // No TLS options provided; create plaintext server
+            server = createServer(sock => this.#socketHandler(sock))
         } else { // TLS options provided; create TLS server
             // Check for TLS support
             if(tls === null)
@@ -141,13 +162,27 @@ class Ircd {
             server = tls.createServer({ key, cert }, sock => this.#socketHandler(sock))
         }
 
-        // Listen
-        await new Promise((res, _rej) => server.listen(port, host || '127.0.0.1', res))
+        await this.listenWithServer(port, host, server)
+    }
+
+    /**
+     * Listens on the specified port, and optionally host.
+     * Uses the provided {@link Server} instance.
+     * If you don't need to provide your own, use the {@link listen} function instead.
+     * @param port {number} port The port to listen on
+     * @param host {string} [host='127.0.0.1'] The host to listen on (defaults to `'127.0.0.1'`)
+     * @param {Server} server The {@link Server} instance to listen with
+     * @public
+     * @returns {Promise<void>}
+     */
+    async listenWithServer(port, host = '127.0.0.1', server) {
+        await new Promise((res, _rej) => server.listen(port, host, /** @type {() => void} */ (res)))
     }
 
     /**
      * Registers a client connect handler
      * @param {IrcClientConnectHandler} handler The handler
+     * @public
      * @since 1.0.0
      */
     onConnect(handler) {
@@ -157,19 +192,36 @@ class Ircd {
     /**
      * Broadcasts a notice to all clients
      * @param {string} message The notice
-     * @param {string|null} name The name that will appear next to the announcement, or null for none (defaults to null)
+     * @param {string | null} [name=null] The name that will appear next to the announcement, or null for none (defaults to null)
+     * @param {boolean} [awaitAll=false] Whether to await the sending of all the notices.
+     * Use this only when you want to absolutely ensure delivery, because this will be slow if there are many connected clients.
+     * If {@link awaitAll} is `true`, this method will also throw an error if any of the notices fails to send.
+     * In contrast, if {@link awaitAll} is `false`, this method will be executed in a fire-and-forget manner.
+     * Defaults to `false`.
      * @returns {Promise<void>}
+     * @public
      * @since 1.0.0
      */
-    broadcastNotice(message, name = null) {
-        for(const client of this.connectedClients)
-            client.sendNotice(message, name).finally()
+    async broadcastNotice(message, name = null, awaitAll = false) {
+        if (awaitAll) {
+            /** @type {Promise<void>[]} */
+            const promises = []
+            for (const client of this.connectedClients)
+                promises.push(client.sendNotice(message, name))
+
+            await Promise.all(promises)
+        } else {
+            for (const client of this.connectedClients)
+                client.sendNotice(message, name).finally()
+        }
     }
 
     /**
      * Returns whether there is a client with the specified nick connected
      * @param {string} nick The nick to check for
      * @returns {boolean} Whether there is a client with the specified nick connected
+     * @public
+     * @since 1.0.0
      */
     isNickConnected(nick) {
         for(const client of this.authenticatedClients)
@@ -184,6 +236,8 @@ class Ircd {
      * If you have multiple clients connected with the same nick, you may want to use getClientsByNick(nick).
      * @param {string} nick The nick to search for
      * @returns {IrcClient|null} The client or null if none was found
+     * @public
+     * @since 1.0.0
      */
     getClientByNick(nick) {
         for(const client of this.authenticatedClients)
@@ -198,6 +252,8 @@ class Ircd {
      * If you just want to return one client, you may want to use getClientByNick(nick).
      * @param {string} nick The nick to search for
      * @returns {IrcClient[]} The clients
+     * @public
+     * @since 1.0.0
      */
     getClientsByNick(nick) {
         const res = []
