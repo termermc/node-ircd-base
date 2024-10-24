@@ -1,16 +1,24 @@
 {
 	"compilerOptions": {
-		"module": "commonjs",
+		"module": "ES2022",
 		"noImplicitAny": true,
+		"declaration": true,
 		"removeComments": true,
 		"preserveConstEnums": true,
 		"sourceMap": true,
 		"allowJs": true,
-		"resolveJsonModule": true,
 		"checkJs": true,
-		"esModuleInterop": true,
-		"target": "ES2021",
+		"target": "ES2022",
+		"strict": true,
+		"strictNullChecks": true,
+		"strictFunctionTypes": true,
+		"strictBindCallApply": true,
+		"strictPropertyInitialization": true,
+		"alwaysStrict": true,
+		"noImplicitThis": true,
+		"skipLibCheck": true,
+		"outDir": "dist"
 	},
-	"include": ["src/**/*", "examples/**/*"],
-	"exclude": ["**/*.spec.ts"]
+	"include": ["index.ts", "src/**/*", "examples/**/*"],
+	"exclude": ["**/*.spec.ts", "node_modules", "dist", "examples/**/*"]
 }

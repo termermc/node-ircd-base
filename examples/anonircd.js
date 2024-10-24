@@ -39,7 +39,7 @@ const config = {
 		username: 'anon',
 		realname: 'Anonymous',
 		hostname: 'anonymous.anon',
-		status: 'H' // Online, no special permissions
+		status: 'H', // Online, no special permissions
 	},
 
 	motd: `
@@ -47,23 +47,23 @@ Welcome to the AnonIRCd!
 Here, all of your messages appear under the nick "anon", and nobody knows who says what.
 Enjoy!
 -
-`
+`,
 }
 
 // Record the start time
 const startTime = new Date()
 
 // Create IRCd
-const { Ircd } = require('../index')
+import { Ircd } from '../dist/index.js'
 const ircd = new Ircd(config.hostname)
 
 // Create connection logic
-ircd.onConnect(async function(client) {
+ircd.onConnect(async function (client) {
 	console.log('Client connected')
 
-	client.onLoginAttempt(async function(userInfo, password, accept, deny) {
+	client.onLoginAttempt(async function (userInfo, password, accept, deny) {
 		// Check if the nick is already taken
-		if(ircd.isNickConnected(userInfo.nick)) {
+		if (ircd.isNickConnected(userInfo.nick)) {
 			console.log(`Client tried to take the name ${userInfo.nick} but it was already taken`)
 			await client.sendNickRejected(userInfo.nick)
 			await deny()
@@ -73,7 +73,7 @@ ircd.onConnect(async function(client) {
 		// If all went well, accept the auth attempt
 		await accept()
 	})
-	client.onSuccessfulLogin(async function() {
+	client.onSuccessfulLogin(async function () {
 		console.log(`User ${client.nick} authenticated`)
 
 		// Do initial client setup
@@ -82,7 +82,7 @@ ircd.onConnect(async function(client) {
 			`Your host is ${config.hostname} running AnonIRCd`,
 			`The server was created on ${startTime.toISOString()}`,
 			'AnonIRCd',
-			config.networkName
+			config.networkName,
 		)
 		await client.sendMotd(config.motd)
 		await client.setMode('+Zi')
@@ -92,18 +92,19 @@ ircd.onConnect(async function(client) {
 		await client.sendSelfJoin(config.channel)
 
 		// Send join to other clients
-		for(const authClient of ircd.authenticatedClients) {
-			if(authClient.nick !== client.nick)
+		for (const authClient of ircd.authenticatedClients) {
+			if (authClient.nick !== client.nick) {
 				authClient.sendUserJoin(config.channel, client.userInfo).finally()
+			}
 		}
 	})
-	client.onDisconnect(function() {
-		if(client.isAuthenticated) {
+	client.onDisconnect(function () {
+		if (client.isAuthenticated) {
 			console.log(`User ${client.nick} disconnected`)
 
 			// Send part to other clients
-			for(const authClient of ircd.authenticatedClients) {
-				if(authClient.nick !== client.nick)
+			for (const authClient of ircd.authenticatedClients) {
+				if (authClient.nick !== client.nick)
 					authClient.sendUserPart(config.channel, client.userInfo, 'Disconnected')
 			}
 		} else {
@@ -111,38 +112,53 @@ ircd.onConnect(async function(client) {
 		}
 	})
 
-	client.onChannelInfo(async function(channel) {
-		if(channel === config.channel)
-			await client.sendChannelInfo(channel, config.channelTopic, config.anonInfo, '+Cnt', startTime, ircd.authenticatedClients.map(c => c.userInfo))
+	client.onChannelInfo(async function (channel) {
+		if (channel === config.channel) {
+			await client.sendChannelInfo(
+				channel,
+				config.channelTopic,
+				config.anonInfo,
+				'+Cnt',
+				startTime,
+				ircd.authenticatedClients.map(c => c.userInfo),
+			)
+		}
 	})
-	client.onChannelUsers(async function(channel) {
-		await client.sendChannelUsers(channel, ircd.authenticatedClients.map(c => c.userInfo))
+	client.onChannelUsers(async function (channel) {
+		await client.sendChannelUsers(
+			channel,
+			ircd.authenticatedClients.map(c => c.userInfo),
+		)
 	})
 
-	client.onChatMessage(function(channel, message) {
+	client.onChatMessage(function (channel, message) {
 		// Ignore messages not sent in the main channel
-		if(channel !== config.channel)
+		if (channel !== config.channel) {
 			return
+		}
 
 		// Log real user and message
 		console.log(`<${client.nick}> ${message}`)
 
 		// Send anonymous message to channel users
-		for(const authClient of ircd.authenticatedClients) {
-			if(authClient.nick !== client.nick)
+		for (const authClient of ircd.authenticatedClients) {
+			if (authClient.nick !== client.nick) {
 				authClient.sendChatMessage(channel, config.anonInfo, message)
+			}
 		}
 	})
 
 	// If the client tries to join the channel (like if the force join didn't work), just send a normal join
-	client.onJoin(function(channels) {
-		for(const channel of channels)
-			if(channel === config.channel)
+	client.onJoin(function (channels) {
+		for (const channel of channels) {
+			if (channel === config.channel) {
 				client.sendSelfJoin(channel)
+			}
+		}
 	})
 })
 
 // Start server
-ircd.listen(config.port, config.host).then(function() {
+ircd.listen(config.port, config.host).then(function () {
 	console.log(`Listening at ${config.host}:${config.port}`)
 })
