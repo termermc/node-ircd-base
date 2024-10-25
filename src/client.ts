@@ -916,6 +916,10 @@ export class IrcClient {
 
 			hasHandledClose = true
 
+			if (!this.socket.closed) {
+				this.socket.destroy()
+			}
+
 			this.#disconnected = true
 			clearInterval(pingInterval)
 
@@ -925,6 +929,7 @@ export class IrcClient {
 
 		// Setup socket handlers
 		this.socket.on('close', closeHandler)
+		this.socket.on('end', closeHandler)
 		this.socket.on('error', err => IrcClient.#dispatchEvent('socket error', this.#socketErrorHandlers, [err]))
 
 		/**
@@ -1260,7 +1265,7 @@ export class IrcClient {
 		}
 
 		// Close the client
-		await new Promise((res, _rej) => this.socket.end(() => res))
+		this.socket.destroy()
 	}
 
 	/**
