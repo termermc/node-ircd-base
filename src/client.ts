@@ -917,16 +917,37 @@ export class IrcClient {
 			hasHandledClose = true
 
 			this.#disconnected = true
-			IrcClient.#dispatchEvent('disconnect', this.#disconnectHandlers)
 			clearInterval(pingInterval)
+
+			// Send out disconnect event, but don't wait on it or throw an error if it fails
+			IrcClient.#dispatchEvent('disconnect', this.#disconnectHandlers).catch(() => {})
 		}
 
 		// Setup socket handlers
 		this.socket.on('close', closeHandler)
 		this.socket.on('error', err => IrcClient.#dispatchEvent('socket error', this.#socketErrorHandlers, [err]))
 
-		// Malformed line error util
-		const sendMalformedLnErr = () => this.sendError('Malformed line received')
+		/**
+		 * Sends a malformed line error to the client.
+		 * If the socket is disconnected, it does nothing.
+		 * If it fails to send the message because the socket is closed, it will try to close the socket.
+		 *
+		 * Always return from whatever function this is called in immediately after calling it,
+		 * as the socket may have been closed by it.
+		 */
+		const sendMalformedLnErr = async () => {
+			if (this.isDisconnected) {
+				return
+			}
+
+			try {
+				await this.sendError('Malformed line received')
+			} catch (err) {
+				if ((err as any).code === 'ERR_SOCKET_CLOSED' || (err as any).code === 'ERR_STREAM_WRITE_AFTER_END') {
+					closeHandler()
+				}
+			}
+		}
 
 		// Unfinished user info awaiting completion (only using during the authentication stage)
 		let authNick: string | null = null
