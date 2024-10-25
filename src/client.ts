@@ -904,12 +904,25 @@ export class IrcClient {
 		// Periodically ping the client
 		const pingInterval = setInterval(() => this.ping(), this.ircd.clientPingPeriod)
 
-		// Setup socket handlers
-		this.socket.on('close', () => {
+		/**
+		 * Whether the client close event has already been handled.
+		 */
+		let hasHandledClose = false
+
+		const closeHandler = () => {
+			if (hasHandledClose) {
+				return
+			}
+
+			hasHandledClose = true
+
 			this.#disconnected = true
 			IrcClient.#dispatchEvent('disconnect', this.#disconnectHandlers)
 			clearInterval(pingInterval)
-		})
+		}
+
+		// Setup socket handlers
+		this.socket.on('close', closeHandler)
 		this.socket.on('error', err => IrcClient.#dispatchEvent('socket error', this.#socketErrorHandlers, [err]))
 
 		// Malformed line error util
@@ -935,6 +948,7 @@ export class IrcClient {
 			input: this.socket,
 			crlfDelay: Infinity,
 		})
+		lineReader.on('close', closeHandler)
 		lineReader.on('line', async ln => {
 			try {
 				const parsed = IrcClient.parseLine(ln)
@@ -1201,11 +1215,16 @@ export class IrcClient {
 
 	/**
 	 * Disconnects the client, optionally sending an error message before.
+	 * Does nothing if the client is already disconnected.
 	 * @param errorMsg The error message to send, or null for none (defaults to null)
 	 * @param msgTimeout The timeout in millilseconds to wait for the error message to send before disconnecting the client (defaults to 5_000) (has no effect is errorMsg is null)
 	 * @since 1.0.0
 	 */
 	public async disconnect(errorMsg: string | null = null, msgTimeout: number = 5_000): Promise<void> {
+		if (this.isDisconnected) {
+			return
+		}
+
 		// Try to send the error message
 		if (errorMsg !== null) {
 			await new Promise<void>(async (res, rej) => {
@@ -1228,9 +1247,26 @@ export class IrcClient {
 	 * @param line The line to send
 	 * @param prependTime Whether to prepend the current timestamp (defaults to true)
 	 * @param timestamp The timestamp to prepend or null for now (defaults to null)
+	 * @param errorIfDisconnected Whether to throw an error if the client is disconnected instead of logging a warning (defaults to false)
 	 * @since 1.0.0
 	 */
-	public async sendRawLine(line: string, prependTime: boolean = true, timestamp: Date | null = null): Promise<void> {
+	public async sendRawLine(line: string, prependTime: boolean = true, timestamp: Date | null = null, errorIfDisconnected: boolean = false): Promise<void> {
+		if (this.isDisconnected) {
+			const msg = `Tried to send raw line to disconnected client ${this.nick ?? '<unauthenticated client>'} (connected from ${this.socket.remoteAddress}:${this.socket.remotePort})`
+
+			if (errorIfDisconnected) {
+				throw new Error(msg)
+			} else {
+				console.warn(msg)
+			}
+
+			return
+		}
+
+		if (this.socket.closed) {
+			throw new Error(`BUG: Tried to send to closed socket, but isDisconnected was false`)
+		}
+
 		const ln =
 			prependTime && this.capabilities.includes('server-time')
 				? `@time=${(timestamp || new Date()).toISOString()} ${line}`
