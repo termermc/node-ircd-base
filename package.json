@@ -10,7 +10,7 @@
 		"format": "prettier --write .",
 		"check": "tsc --noEmit",
 		"build": "tsc",
-		"publish": "npm run build"
+		"doPublish": "npm run build && npm publish"
 	},
 	"keywords": [
 		"ircd",
