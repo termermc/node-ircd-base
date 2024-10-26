@@ -303,6 +303,13 @@ export class IrcClient {
 	}
 
 	/**
+	 * The time the last ping took to complete.
+	 * If the client is disconnected, this will be -1.
+	 * @private
+	 */
+	#lastPingTook: number = -1
+
+	/**
 	 * The user's current mode.
 	 */
 	#mode: string = ''
@@ -311,6 +318,15 @@ export class IrcClient {
 	 * Whether the client disconnected.
 	 */
 	#disconnected: boolean = false
+
+	/**
+	 * The time the last ping took to complete.
+	 * If the client is disconnected, this will be -1.
+	 * @since 1.4.3
+	 */
+	public get lastPingTook(): number {
+		return this.#lastPingTook
+	}
 
 	/**
 	 * Returns the user's current mode.
@@ -832,6 +848,7 @@ export class IrcClient {
 
 	/**
 	 * Dispatches event handlers.
+	 * Handles its own errors, safe to fire and forget.
 	 * @param name The event name
 	 * @param handlers The handlers
 	 * @param data Data to feed to the handlers
@@ -898,11 +915,16 @@ export class IrcClient {
 	/**
 	 * Initializes the client.
 	 * For internal use only; do not call outside of internal library code.
-	 * @since 1.0.0
+	 * This method is subject to change between patch versions.
+	 * @internal
 	 */
-	public async initialize(): Promise<void> {
+	_initialize(): void {
 		// Periodically ping the client
-		const pingInterval = setInterval(() => this.ping(), this.ircd.clientPingPeriod)
+		const pingInterval = setInterval(async () => {
+			try {
+				this.#lastPingTook = await this.ping()
+			} catch (err) {}
+		}, this.ircd.clientPingPeriod)
 
 		/**
 		 * Whether the client close event has already been handled.
@@ -930,7 +952,14 @@ export class IrcClient {
 		// Setup socket handlers
 		this.socket.on('close', closeHandler)
 		this.socket.on('end', closeHandler)
-		this.socket.on('error', err => IrcClient.#dispatchEvent('socket error', this.#socketErrorHandlers, [err]))
+		this.socket.on('error', err => {
+			if ((err as any).code === 'ECONNRESET') {
+				closeHandler()
+				return
+			}
+
+			IrcClient.#dispatchEvent('socket error', this.#socketErrorHandlers, [err]).finally()
+		})
 
 		/**
 		 * Sends a malformed line error to the client.
@@ -1793,10 +1822,15 @@ export class IrcClient {
 
 	/**
 	 * Pings the client and returns the number of milliseconds it took to receive a reply.
+	 * If this method is called on a disconnected client, it will return -1 and do nothing.
 	 * @returns The number of milliseconds it took to receive a reply
 	 * @since 1.0.0
 	 */
 	public async ping(): Promise<number> {
+		if (this.isDisconnected) {
+			return -1;
+		}
+
 		const start = Date.now()
 
 		// Send ping

@@ -112,6 +112,12 @@ export class Ircd {
 		// Add client to clients list
 		this.connectedClients.push(client)
 
+		// Initialize the client.
+		// It's important to initialize the client before any await calls are made,
+		// because the method is responsible for wiring up socket events, including
+		// errors, which could otherwise crash the process.
+		client._initialize()
+
 		// Dispatch connect event
 		for (const handler of this.#connectHandlers) {
 			await handler(client)
@@ -141,9 +147,6 @@ export class Ircd {
 				}
 			}
 		})
-
-		// Initialize the client
-		await client.initialize()
 	}
 
 	/**
